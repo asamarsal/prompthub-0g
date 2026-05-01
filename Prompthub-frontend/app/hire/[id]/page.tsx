@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { fetchUserByAddress, ApiUser, getPrompts, getArtistReviews, createHireRequest, verifyHireEscrow } from "@/lib/api"
 import { useWallet } from "@/lib/wallet-context"
 import { parseEther } from "ethers"
-import { getEscrowContract } from "@/lib/evm"
+import { getEscrowContract, checkAgentVerified } from "@/lib/evm"
 
 export default function ArtistPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
@@ -17,6 +17,9 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
     const [reviews, setReviews] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [fundingEscrow, setFundingEscrow] = useState(false)
+    const [completingJob, setCompletingJob] = useState(false)
+    const [onChainJobId, setOnChainJobId] = useState<number | null>(null)
+    const [agentVerified, setAgentVerified] = useState(false)
 
     useEffect(() => {
         Promise.all([
@@ -28,6 +31,11 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                 setPortfolio(promptsData?.data || [])
                 if (userData?.id) {
                     getArtistReviews(userData.id).then(r => setReviews(r?.data || []))
+                }
+            })
+            .then(([userData]) => {
+                if (userData?.wallet_address) {
+                    checkAgentVerified(userData.wallet_address).then(setAgentVerified)
                 }
             })
             .catch(err => console.error("Missing artist record:", err))
@@ -92,6 +100,17 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
             })
             await tx.wait()
 
+            // Parse jobId from the tx receipt logs
+            const receipt = await tx.wait()
+            const jobCreatedEvent = receipt?.logs?.[0]
+            if (jobCreatedEvent) {
+                try {
+                    const iface = escrow.interface
+                    const parsed = iface.parseLog({ topics: [...jobCreatedEvent.topics], data: jobCreatedEvent.data })
+                    if (parsed?.args?.[0]) setOnChainJobId(Number(parsed.args[0]))
+                } catch {}
+            }
+
             const created = await createHireRequest({
                 artist_address: user.wallet_address,
                 project_brief: projectBrief.trim(),
@@ -107,6 +126,29 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
             alert(err?.shortMessage || err?.message || "Failed to fund escrow")
         } finally {
             setFundingEscrow(false)
+        }
+    }
+
+    const handleCompleteJob = async () => {
+        if (!onChainJobId) {
+            const jobIdInput = window.prompt("Enter the on-chain Job ID to complete:")
+            if (!jobIdInput || isNaN(Number(jobIdInput))) return
+            setOnChainJobId(Number(jobIdInput))
+        }
+        const jobId = onChainJobId || Number(window.prompt("Job ID:"))
+        if (!jobId) return
+
+        setCompletingJob(true)
+        try {
+            const escrow = await getEscrowContract()
+            const tx = await escrow.completeJob(jobId)
+            await tx.wait()
+            alert("Job completed! Funds released to artist.")
+        } catch (err: any) {
+            console.error(err)
+            alert(err?.shortMessage || err?.message || "Failed to complete job")
+        } finally {
+            setCompletingJob(false)
         }
     }
 
@@ -133,7 +175,7 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                                 <div>
                                     <div className="flex items-center gap-1.5">
                                         <span className="font-extrabold text-white uppercase">{artist.name}</span>
-                                        {artist.is_verified && <BadgeCheck className="w-4 h-4 text-[#00ffff]" />}
+                                        {(artist.is_verified || agentVerified) && <BadgeCheck className="w-4 h-4 text-[#00ffff]" />}
                                     </div>
                                     <span className="text-xs font-mono text-[#a78bfa]">@{artist.handle}</span>
                                 </div>
@@ -199,6 +241,13 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                                         style={{ borderColor: accent, background: `${accent}22`, color: "white", boxShadow: `4px 4px 0 0 ${accent}` }}
                                     >
                                         {fundingEscrow ? "Funding Escrow..." : "Fund Escrow & Create Hire"}
+                                    </button>
+                                    <button
+                                        onClick={handleCompleteJob}
+                                        disabled={completingJob}
+                                        className="w-full py-2.5 font-extrabold uppercase tracking-wider text-xs border-2 border-[#b4ff39] bg-[#b4ff39]/10 text-[#b4ff39] hover:bg-[#b4ff39]/20 transition-all disabled:opacity-50"
+                                    >
+                                        {completingJob ? "Releasing Funds..." : "Complete Job & Release Escrow"}
                                     </button>
                                     <Link
                                         href={`/messages?to=${artist.handle}`}
