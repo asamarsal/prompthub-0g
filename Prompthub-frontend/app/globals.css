@@ -1,0 +1,461 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Light Mode ─────────────────────────────────────── */
+:root {
+  --background: #f8f8fa;
+  --foreground: #1a1a2e;
+
+  --card: #ffffff;
+  --card-foreground: #1a1a2e;
+
+  --popover: #ffffff;
+  --popover-foreground: #1a1a2e;
+
+  --primary: #0891b2;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e11d74;
+  --secondary-foreground: #ffffff;
+
+  --muted: #f0f0f4;
+  --muted-foreground: #64748b;
+
+  --accent: #ea580c;
+  --accent-foreground: #ffffff;
+
+  --destructive: #e11d48;
+  --destructive-foreground: #ffffff;
+
+  --border: #e2e2e8;
+  --input: #f0f0f4;
+  --ring: #0891b2;
+
+  --radius: 0rem;
+
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --nav-border: rgba(0, 0, 0, 0.06);
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --shadow-neo: rgba(0, 0, 0, 0.12);
+  --neon-glow: rgba(8, 145, 178, 0.15);
+  --neon-glow-secondary: rgba(225, 29, 116, 0.10);
+}
+
+/* ── Dark Mode (Cyberpunk) ──────────────────────────── */
+.dark {
+  --background: #080808;
+  --foreground: #ffffff;
+
+  --card: #0d0d0d;
+  --card-foreground: #ffffff;
+
+  --popover: #0d0d0d;
+  --popover-foreground: #ffffff;
+
+  --primary: #00d9ff;
+  --primary-foreground: #0A0A0B;
+
+  --secondary: #ff6b9d;
+  --secondary-foreground: #0A0A0B;
+
+  --muted: #222226;
+  --muted-foreground: #a6a6aa;
+
+  --accent: #f97316;
+  --accent-foreground: #0A0A0B;
+
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffffff;
+
+  --border: #2e2e33;
+  --input: #222226;
+  --ring: #00d9ff;
+
+  --nav-bg: rgba(10, 10, 12, 0.80);
+  --nav-border: rgba(255, 255, 255, 0.05);
+  --glass-bg: rgba(0, 0, 0, 0.40);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --shadow-neo: rgba(255, 255, 255, 0.10);
+  --neon-glow: rgba(0, 217, 255, 0.05);
+  --neon-glow-secondary: rgba(255, 107, 157, 0.05);
+}
+
+@theme inline {
+  --font-sans: 'Outfit', sans-serif;
+  --font-display: 'Oxanium', sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground;
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(circle at 15% 50%, var(--neon-glow), transparent 25%),
+      radial-gradient(circle at 85% 30%, var(--neon-glow-secondary), transparent 25%);
+    background-attachment: fixed;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    @apply font-bold tracking-tight uppercase;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-sans {
+    font-family: var(--font-sans);
+  }
+
+  /* Cyberpunk Neobrutalism Utilities */
+  .neo-box {
+    @apply bg-card border-2 backdrop-blur-xl transition-all duration-300;
+    border-color: var(--glass-border);
+    box-shadow: 6px 6px 0px 0px var(--shadow-neo);
+  }
+
+  .neo-box:hover {
+    @apply border-primary;
+    box-shadow: 6px 6px 0px 0px var(--primary);
+    transform: translate(-2px, -2px);
+  }
+
+  .neo-btn-primary {
+    @apply relative inline-flex items-center justify-center px-6 py-3 font-display font-bold text-primary-foreground bg-primary border-2 border-primary uppercase tracking-wider overflow-hidden transition-all duration-200;
+    box-shadow: 4px 4px 0px 0px var(--shadow-neo);
+  }
+
+  .neo-btn-primary:hover:not(:disabled) {
+    @apply text-primary-foreground;
+    opacity: 0.85;
+    box-shadow: 6px 6px 0px 0px var(--primary);
+    transform: translate(-2px, -2px);
+    text-shadow: 0 0 8px var(--primary);
+  }
+
+  .neo-btn-primary:active:not(:disabled) {
+    transform: translate(4px, 4px);
+    box-shadow: 0px 0px 0px 0px var(--primary);
+  }
+
+  .neo-btn-secondary {
+    @apply relative inline-flex items-center justify-center px-6 py-3 font-display font-bold text-foreground bg-transparent border-2 uppercase tracking-wider transition-all duration-200;
+    border-color: var(--glass-border);
+    box-shadow: 4px 4px 0px 0px var(--shadow-neo);
+  }
+
+  .neo-btn-secondary:hover:not(:disabled) {
+    @apply border-secondary text-secondary;
+    box-shadow: 6px 6px 0px 0px var(--secondary);
+    transform: translate(-2px, -2px);
+  }
+
+  /* Glassmorphism hero CTA with Neobrutalism hover shadow */
+  .hero-glass-btn:hover {
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15),
+      0 0 24px rgba(0, 217, 255, 0.35),
+      6px 6px 0px 0px rgba(0, 100, 140, 0.9) !important;
+    transform: translate(-2px, -2px);
+  }
+
+  .neo-btn-secondary:active:not(:disabled) {
+    transform: translate(4px, 4px);
+    box-shadow: 0px 0px 0px 0px var(--secondary);
+  }
+
+  .neo-input {
+    @apply w-full bg-input border-2 border-border text-foreground px-4 py-3 font-sans focus:outline-none focus:border-primary transition-colors placeholder:text-muted-foreground;
+    box-shadow: inset 2px 2px 0px 0px rgba(0, 0, 0, 0.08);
+  }
+
+  .glass-panel {
+    background: var(--glass-bg);
+    @apply backdrop-blur-md;
+    border: 1px solid var(--glass-border);
+  }
+
+  .text-glow-primary {
+    text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+  }
+
+  .text-glow-secondary {
+    text-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
+  }
+
+  /* CRT scanline effect overlay */
+  .crt-overlay::before {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 50;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+    opacity: 0.3;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT MODE OVERRIDES
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Dark solid backgrounds → light ── */
+:root:not(.dark) [class*="bg-[#080808]"]:not(video):not([aria-hidden]),
+:root:not(.dark) [class*="bg-[#0a0a0c]"]:not(video):not([aria-hidden]),
+:root:not(.dark) [class*="bg-[#0a0a0b]"]:not(video):not([aria-hidden]),
+:root:not(.dark) [class*="bg-[#0a001a]"]:not(video):not([aria-hidden]),
+:root:not(.dark) [class*="bg-[#0d0d0d]"]:not(video):not([aria-hidden]) {
+  background-color: var(--background) !important;
+}
+
+:root:not(.dark) [class*="bg-[#111]"]:not([aria-hidden]),
+:root:not(.dark) [class*="bg-[#0f0f13]"],
+:root:not(.dark) [class*="bg-[#16161a]"],
+:root:not(.dark) [class*="bg-[#161218]"],
+:root:not(.dark) [class*="bg-[#160f24]"],
+:root:not(.dark) [class*="bg-[#1a1a20]"] {
+  background-color: var(--card) !important;
+}
+
+/* ── Muted backgrounds ── */
+:root:not(.dark) [class*="bg-[#222226]"],
+:root:not(.dark) [class*="bg-[#2a2a30]"] {
+  background-color: var(--muted) !important;
+}
+
+/* ── Semi-transparent dark overlays (NOT video/hero overlays) ── */
+:root:not(.dark) [class*="bg-black/50"]:not([aria-hidden]):not([data-hero] *),
+:root:not(.dark) [class*="bg-black/40"]:not([aria-hidden]):not([data-hero] *),
+:root:not(.dark) [class*="bg-black/30"]:not([aria-hidden]):not([data-hero] *),
+:root:not(.dark) [class*="bg-black/20"]:not([aria-hidden]):not([data-hero] *) {
+  background-color: var(--input) !important;
+}
+
+/* ── Text: white → dark foreground ── */
+/* Use a data attribute on the hero to exclude it */
+:root:not(.dark) [class*="text-white"]:not([class*="text-white/"]):not([data-hero] *):not([data-hero]) {
+  color: var(--foreground) !important;
+}
+
+:root:not(.dark) [class*="text-[#e0d4ff]"] {
+  color: var(--foreground) !important;
+}
+
+/* ── Muted text: ensure readable contrast on light bg ── */
+:root:not(.dark) [class*="text-[#a78bfa]"]:not([class*="text-[#a78bfa]/"]) {
+  color: #6b7280 !important;
+}
+
+:root:not(.dark) [class*="text-[#a78bfa]/50"],
+:root:not(.dark) [class*="text-[#a78bfa]/40"],
+:root:not(.dark) [class*="text-[#a78bfa]/30"] {
+  color: #9ca3af !important;
+  opacity: 1 !important;
+}
+
+:root:not(.dark) [class*="text-[#a78bfa]/60"],
+:root:not(.dark) [class*="text-[#a78bfa]/70"] {
+  color: #6b7280 !important;
+  opacity: 1 !important;
+}
+
+:root:not(.dark) [class*="text-white/70"]:not([data-hero] *),
+:root:not(.dark) [class*="text-white/60"]:not([data-hero] *) {
+  color: #4b5563 !important;
+}
+
+:root:not(.dark) [class*="text-white/50"]:not([data-hero] *),
+:root:not(.dark) [class*="text-white/40"]:not([data-hero] *) {
+  color: #6b7280 !important;
+}
+
+:root:not(.dark) [class*="text-white/30"]:not([data-hero] *),
+:root:not(.dark) [class*="text-white/20"]:not([data-hero] *) {
+  color: #9ca3af !important;
+}
+
+/* ── Borders ── */
+:root:not(.dark) [class*="border-[#2a2a30]"],
+:root:not(.dark) [class*="border-[#2e2e33]"] {
+  border-color: var(--border) !important;
+}
+
+:root:not(.dark) [class*="border-white/5"]:not([data-hero] *),
+:root:not(.dark) [class*="border-white/10"]:not([data-hero] *),
+:root:not(.dark) [class*="border-white/20"]:not([data-hero] *),
+:root:not(.dark) [class*="border-white/30"]:not([data-hero] *) {
+  border-color: var(--border) !important;
+}
+
+/* ── Neon accents: darker for light mode readability ── */
+:root:not(.dark) [class*="text-[#00ffff]"] {
+  color: #0e7490 !important;
+}
+
+:root:not(.dark) [class*="text-[#ff2d95]"] {
+  color: #be185d !important;
+}
+
+:root:not(.dark) [class*="text-[#b4ff39]"] {
+  color: #4d7c0f !important;
+}
+
+:root:not(.dark) [class*="bg-[#00ffff]"] {
+  background-color: #0891b2 !important;
+}
+
+:root:not(.dark) [class*="bg-[#ff2d95]"] {
+  background-color: #db2777 !important;
+}
+
+:root:not(.dark) [class*="bg-[#b4ff39]"] {
+  background-color: #65a30d !important;
+}
+
+:root:not(.dark) [class*="border-[#00ffff]"] {
+  border-color: #0891b2 !important;
+}
+
+:root:not(.dark) [class*="border-[#ff2d95]"] {
+  border-color: #db2777 !important;
+}
+
+:root:not(.dark) [class*="border-[#b4ff39]"] {
+  border-color: #65a30d !important;
+}
+
+/* ── Buttons: ensure text contrast ── */
+:root:not(.dark) [class*="bg-[#00ffff]"][class*="text-black"] {
+  background-color: #0891b2 !important;
+  color: #ffffff !important;
+}
+
+:root:not(.dark) [class*="bg-[#b4ff39]"][class*="text-black"] {
+  background-color: #65a30d !important;
+  color: #ffffff !important;
+}
+
+/* ── Shadows ── */
+:root:not(.dark) [class*="shadow-[4px_4px_0_0_#00ffff]"],
+:root:not(.dark) [class*="shadow-[6px_6px_0_0_#00ffff]"],
+:root:not(.dark) [class*="shadow-[8px_8px_0px_0px_#00ffff]"],
+:root:not(.dark) [class*="shadow-[inset_0_0_0_1px_#00ffff"] {
+  box-shadow: 4px 4px 0px 0px #0891b2 !important;
+}
+
+:root:not(.dark) [class*="shadow-[4px_4px_0_0_#ff2d95]"],
+:root:not(.dark) [class*="shadow-[6px_6px_0_0_#ff2d95]"],
+:root:not(.dark) [class*="shadow-[8px_8px_0px_0px_#ff2d95]"],
+:root:not(.dark) [class*="shadow-[inset_0_0_0_1px_#ff2d95"] {
+  box-shadow: 4px 4px 0px 0px #db2777 !important;
+}
+
+:root:not(.dark) [class*="shadow-[4px_4px_0_0_#fff]"],
+:root:not(.dark) [class*="shadow-[2px_2px_0_0_#fff]"],
+:root:not(.dark) [class*="shadow-[2px_2px_0_0_#d1d5db]"],
+:root:not(.dark) [class*="shadow-[8px_8px_0_0_#2a2a30]"],
+:root:not(.dark) [class*="shadow-[6px_6px_0_0_#a855f7]"] {
+  box-shadow: 3px 3px 0px 0px rgba(0, 0, 0, 0.1) !important;
+}
+
+:root:not(.dark) [class*="shadow-[0_0_10px_#ff2d95]"] {
+  box-shadow: 0 0 6px #db2777 !important;
+}
+
+/* ── Scanline / CRT / glow: hide in light mode ── */
+:root:not(.dark) .crt-overlay::before,
+:root:not(.dark) .y2k-scanlines::before,
+:root:not(.dark) [class*="y2k-grid-bg"] {
+  display: none !important;
+}
+
+:root:not(.dark) .text-glow-primary,
+:root:not(.dark) .text-glow-secondary {
+  text-shadow: none !important;
+}
+
+/* ── Placeholder text ── */
+:root:not(.dark) [class*="placeholder-[#a78bfa]"],
+:root:not(.dark) [class*="placeholder:text-white"],
+:root:not(.dark) [class*="placeholder-white"] {
+  --tw-placeholder-opacity: 1;
+}
+:root:not(.dark) ::placeholder {
+  color: #9ca3af !important;
+}
+
+/* ── Gradient text: ensure visible ── */
+:root:not(.dark) [class*="from-white"][class*="to-white"] {
+  --tw-gradient-from: #1a1a2e !important;
+  --tw-gradient-to: rgba(26, 26, 46, 0.5) !important;
+}
+
+/* ── Specific fixes ── */
+
+/* Navigation dropdown panel */
+:root:not(.dark) [class*="bg-[#0f0f13]"] {
+  background-color: #ffffff !important;
+  border-color: var(--border) !important;
+}
+
+/* Opacity-based backgrounds on cards */
+:root:not(.dark) [class*="bg-[#160f24]/60"],
+:root:not(.dark) [class*="bg-[#16161a]/60"],
+:root:not(.dark) [class*="bg-[#160f24]/80"] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Ensure gradient avatars keep white text */
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-[#a855f7]"] [class*="text-white"],
+:root:not(.dark) [class*="bg-gradient-to-br"][class*="from-[#ff2d95]"] [class*="text-white"] {
+  color: #ffffff !important;
+}
+
+/* Active tab indicator */
+:root:not(.dark) [class*="bg-[#00ffff]"][class*="shadow-[0_-5px"] {
+  background-color: #0891b2 !important;
+  box-shadow: 0 -3px 10px rgba(8, 145, 178, 0.4) !important;
+}
