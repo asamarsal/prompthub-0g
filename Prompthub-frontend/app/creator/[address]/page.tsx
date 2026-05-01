@@ -12,6 +12,7 @@ import { fetchCreatorProfile, toggleFollow, getPrompts, getPromptReviews } from 
 import { getApiToken } from "@/lib/api"
 import { toast } from "sonner"
 import { CHAIN_CONFIG } from "@/lib/contracts"
+import { checkAgentVerified } from "@/lib/evm"
 
 export default function CreatorProfilePage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = use(params)
@@ -103,8 +104,15 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ addre
 
   const displayName = profile?.name ?? profile?.username ?? creatorAddress.slice(0, 8) + "..."
   const initials = displayName.slice(0, 2).toUpperCase()
-  const isVerified = profile?.roles?.includes("artist") ?? false
+  const [isVerified, setIsVerified] = useState(profile?.roles?.includes("artist") ?? false)
   const stats = profile?.stats ?? {}
+
+  // Check on-chain verification
+  useEffect(() => {
+    if (creatorAddress) {
+      checkAgentVerified(creatorAddress).then(v => { if (v) setIsVerified(true) })
+    }
+  }, [creatorAddress])
 
   if (loading) {
     return (
