@@ -12,7 +12,7 @@ import { fetchCreatorProfile, toggleFollow, getPrompts, getPromptReviews } from 
 import { getApiToken } from "@/lib/api"
 import { toast } from "sonner"
 import { CHAIN_CONFIG } from "@/lib/contracts"
-import { checkAgentVerified } from "@/lib/evm"
+import { checkAgentVerified, getAgentReputation } from "@/lib/evm"
 
 export default function CreatorProfilePage({ params }: { params: Promise<{ address: string }> }) {
   const { address } = use(params)
@@ -111,6 +111,14 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ addre
   useEffect(() => {
     if (creatorAddress) {
       checkAgentVerified(creatorAddress).then(v => { if (v) setIsVerified(true) })
+    }
+  }, [creatorAddress])
+
+  const [reputation, setReputation] = useState<any>(null)
+
+  useEffect(() => {
+    if (creatorAddress) {
+      getAgentReputation(creatorAddress).then(r => { if (r) setReputation(r) })
     }
   }, [creatorAddress])
 
@@ -218,6 +226,22 @@ export default function CreatorProfilePage({ params }: { params: Promise<{ addre
               <p className="mt-3 text-sm text-[#a78bfa] max-w-2xl leading-relaxed border-l-2 border-[#a855f7]/40 pl-3">
                 {profile.bio}
               </p>
+            )}
+            {reputation && (
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">On-Chain Rating:</span>
+                  <span className="font-bold text-primary">{(reputation.avgRating / 10).toFixed(1)}/5.0</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">Jobs:</span>
+                  <span className="font-bold text-[#b4ff39]">{reputation.completedJobs}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">Reviews:</span>
+                  <span className="font-bold text-[#ff2d95]">{reputation.totalReviews}</span>
+                </div>
+              </div>
             )}
           </div>
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { AppShell } from "@/components/app-shell"
-import { Activity, ArrowUpRight, Clock, Copy, DollarSign, Download, Eye, MoreHorizontal, Settings, TrendingUp, User, ShoppingCart, FileText, Star, Plus, BarChart3, ToggleRight, Loader2 } from "lucide-react"
+import { Activity, ArrowUpRight, Clock, Copy, DollarSign, Download, Eye, MoreHorizontal, Settings, TrendingUp, User, ShoppingCart, FileText, Star, Plus, BarChart3, ToggleRight, Loader2, CheckCircle } from "lucide-react"
 import {
   XAxis,
   YAxis,
@@ -15,7 +15,10 @@ import {
 import { useState, useEffect } from "react"
 import { getDashboardData } from "@/lib/api"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
+import { useWallet } from "@/lib/wallet-context"
 import { cn } from "@/lib/utils"
+import { checkAgentRegistered, getAgentRegistryContract } from "@/lib/evm"
+import { toast } from "sonner"
 
 
 
@@ -36,6 +39,33 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const { price: ogPrice } = use0GPrice()
+  const { address: walletAddress } = useWallet()
+  const [agentRegistered, setAgentRegistered] = useState<boolean | null>(null)
+  const [agentRegLoading, setAgentRegLoading] = useState(false)
+
+  useEffect(() => {
+    if (walletAddress) {
+      checkAgentRegistered(walletAddress).then(setAgentRegistered).catch(() => setAgentRegistered(null))
+    }
+  }, [walletAddress])
+
+  const handleRegisterAgent = async () => {
+    const metadataUri = window.prompt("Enter your agent metadata URI (IPFS or URL):")
+    if (!metadataUri || !metadataUri.trim()) return
+    setAgentRegLoading(true)
+    try {
+      const registry = await getAgentRegistryContract()
+      const tx = await registry.registerAgent(metadataUri.trim())
+      await tx.wait()
+      setAgentRegistered(true)
+      toast.success("Successfully registered as AI Agent!")
+    } catch (e: any) {
+      console.error(e)
+      toast.error(e?.shortMessage || "Failed to register agent")
+    } finally {
+      setAgentRegLoading(false)
+    }
+  }
 
   const daysMap = {
     "7D": 7,
@@ -173,6 +203,29 @@ export default function DashboardPage() {
               </div>
             )
           })}
+        </div>
+
+        {/* Agent Registration */}
+        <div className="bg-[#16161a]/60 backdrop-blur-xl border border-[#2a2a30] p-6 mb-12 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-display font-black text-[#ff2d95] uppercase tracking-widest mb-1">AI Agent Status</p>
+            <p className="text-sm text-[#a78bfa]">Register on-chain to enable agent-to-agent interactions and build reputation.</p>
+          </div>
+          {agentRegistered === true ? (
+            <span className="shrink-0 flex items-center gap-2 text-sm font-extrabold text-[#b4ff39] border border-[#b4ff39]/30 bg-[#b4ff39]/10 px-4 py-2">
+              <CheckCircle className="w-4 h-4" />
+              Registered ✓
+            </span>
+          ) : (
+            <button
+              onClick={handleRegisterAgent}
+              disabled={agentRegLoading}
+              className="shrink-0 bg-[#ff2d95] border-2 border-[#ff2d95] text-white px-6 py-2.5 text-sm font-extrabold uppercase tracking-wider hover:shadow-[4px_4px_0_0_#fff] hover:-translate-y-0.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {agentRegLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              Register as AI Agent
+            </button>
+          )}
         </div>
 
         {/* Earnings chart */}

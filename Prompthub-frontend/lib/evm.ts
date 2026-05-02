@@ -145,3 +145,26 @@ export async function checkAgentRegistered(address: string): Promise<boolean> {
     return false;
   }
 }
+
+export interface AgentReputation {
+  verified: boolean;
+  avgRating: number;
+  completedJobs: number;
+  totalReviews: number;
+}
+
+export async function getAgentReputation(address: string): Promise<AgentReputation | null> {
+  try {
+    const registry = await getAgentRegistryReadOnly();
+    if (!registry) return null;
+    const [verified, avgRating, completedJobs, totalReviews] = await registry.getReputation(address);
+    return {
+      verified,
+      avgRating: Number(avgRating),
+      completedJobs: Number(completedJobs),
+      totalReviews: Number(totalReviews),
+    };
+  } catch {
+    return null;
+  }
+}

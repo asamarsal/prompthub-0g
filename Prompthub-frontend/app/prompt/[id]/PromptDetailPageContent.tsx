@@ -772,6 +772,34 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                     >
                                                         Delist
                                                     </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            const newHash = window.prompt("Enter new 0G Storage root hash for updated content:")
+                                                            if (!newHash || !newHash.trim()) return
+                                                            const newUri = window.prompt("Enter new metadata URI (or press Enter to keep current):", prompt.cid || "")
+                                                            
+                                                            setIsActionLoading(true)
+                                                            try {
+                                                                const marketplace = await getMarketplaceContract()
+                                                                const tx = await marketplace.createPromptVersion(
+                                                                    prompt.contract_id,
+                                                                    newUri || prompt.cid || "",
+                                                                    newHash.trim()
+                                                                )
+                                                                await tx.wait()
+                                                                toast.success("New version created on-chain!")
+                                                            } catch (e: any) {
+                                                                console.error(e)
+                                                                toast.error(e?.shortMessage || "Failed to create version")
+                                                            } finally {
+                                                                setIsActionLoading(false)
+                                                            }
+                                                        }}
+                                                        disabled={isActionLoading}
+                                                        className="col-span-2 mt-2 bg-[#160f24] border border-[#2a2a30] py-2 text-[10px] font-bold text-[#b4ff39] hover:border-[#b4ff39] transition-all uppercase"
+                                                    >
+                                                        Create New Version
+                                                    </button>
                                                 </div>
                                             ) : (
                                                 <button
