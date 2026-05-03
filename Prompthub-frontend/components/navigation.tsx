@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { Menu, X, Search, LayoutDashboard, Plus, Wallet, Copy, Check, Palette, Trophy, User, Settings, ChevronDown, Bell, MessageSquare, Heart, ShoppingBag } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWallet, truncateAddress, ROLE_LABELS, ROLE_ICONS, type UserRole } from "@/lib/wallet-context"
@@ -31,6 +32,7 @@ export function Navigation() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [mounted, setMounted] = useState(false)
 
+  const { theme, resolvedTheme } = useTheme()
   const { unreadCount } = useNotifications()
 
   useEffect(() => setMounted(true), [])
@@ -57,7 +59,11 @@ export function Navigation() {
         <div className="mx-auto flex h-16 items-center justify-between px-4 lg:px-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group shrink-0" aria-label="PromptHub Home">
-            <img src="/icon/prompthub-logo.png" alt="PromptHub Logo" className="h-8 max-w-[200px] w-auto object-contain" />
+            <img 
+              src={mounted && resolvedTheme === "light" ? "/icon/prompthub-logo-black.png" : "/icon/prompthub-logo.png"} 
+              alt="PromptHub Logo" 
+              className="h-8 max-w-[200px] w-auto object-contain" 
+            />
           </Link>
 
           <div className="hidden md:flex items-center gap-8 h-full">
