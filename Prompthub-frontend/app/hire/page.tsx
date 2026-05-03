@@ -47,7 +47,7 @@ export default function HirePage() {
                 </div>
 
                 {/* Filters bar */}
-                <div className="flex flex-col md:flex-row gap-4 mb-8">
+                <div className="flex flex-col lg:flex-row gap-4 mb-8">
                     {/* Search */}
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a78bfa]" />
@@ -59,32 +59,34 @@ export default function HirePage() {
                         />
                     </div>
 
-                    {/* Specialty filter */}
-                    <select
-                        value={specialty}
-                        onChange={e => setSpecialty(e.target.value)}
-                        className="bg-[#111] border border-[#2a2a30] text-white text-sm px-3 py-2.5 focus:outline-none focus:border-[#ff2d95] transition-colors cursor-pointer"
-                    >
-                        {specialtyFilters.map(f => <option key={f} value={f}>{f}</option>)}
-                    </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex gap-4">
+                        {/* Specialty filter */}
+                        <select
+                            value={specialty}
+                            onChange={e => setSpecialty(e.target.value)}
+                            className="w-full lg:w-auto bg-[#111] border border-[#2a2a30] text-white text-sm px-3 py-2.5 focus:outline-none focus:border-[#ff2d95] transition-colors cursor-pointer"
+                        >
+                            {specialtyFilters.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
 
-                    {/* Tool filter */}
-                    <select
-                        value={tool}
-                        onChange={e => setTool(e.target.value)}
-                        className="bg-[#111] border border-[#2a2a30] text-white text-sm px-3 py-2.5 focus:outline-none focus:border-[#ff2d95] transition-colors cursor-pointer"
-                    >
-                        {toolFilters.map(f => <option key={f} value={f}>{f}</option>)}
-                    </select>
+                        {/* Tool filter */}
+                        <select
+                            value={tool}
+                            onChange={e => setTool(e.target.value)}
+                            className="w-full lg:w-auto bg-[#111] border border-[#2a2a30] text-white text-sm px-3 py-2.5 focus:outline-none focus:border-[#ff2d95] transition-colors cursor-pointer"
+                        >
+                            {toolFilters.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
 
-                    {/* Available toggle */}
-                    <button
-                        onClick={() => setOnlyAvailable(v => !v)}
-                        className={`px-4 py-2.5 text-sm font-bold uppercase tracking-wider border-2 transition-all ${onlyAvailable ? "border-[#b4ff39] text-[#b4ff39] bg-[#b4ff39]/10" : "border-[#2a2a30] text-white/40 hover:border-white/30"}`}
-                    >
-                        <Zap className="w-3.5 h-3.5 inline mr-1.5" />
-                        Available Now
-                    </button>
+                        {/* Available toggle */}
+                        <button
+                            onClick={() => setOnlyAvailable(v => !v)}
+                            className={`w-full lg:w-auto px-4 py-2.5 text-sm font-bold uppercase tracking-wider border-2 transition-all ${onlyAvailable ? "border-[#b4ff39] text-[#b4ff39] bg-[#b4ff39]/10" : "border-[#2a2a30] text-white/40 hover:border-white/30"}`}
+                        >
+                            <Zap className="w-3.5 h-3.5 inline mr-1.5" />
+                            Available
+                        </button>
+                    </div>
                 </div>
 
                 {/* Count */}

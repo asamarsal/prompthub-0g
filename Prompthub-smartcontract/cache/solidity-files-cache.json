@@ -157,6 +157,44 @@
         "ERC721"
       ]
     },
+    "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\interfaces\\draft-IERC6093.sol": {
+      "lastModificationDate": 1777671598243,
+      "contentHash": "bcc76f4747d56c28c40ae272ef3470a6",
+      "sourceName": "@openzeppelin/contracts/interfaces/draft-IERC6093.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "cancun",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        ">=0.8.4"
+      ],
+      "artifacts": [
+        "IERC1155Errors",
+        "IERC20Errors",
+        "IERC721Errors"
+      ]
+    },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\Strings.sol": {
       "lastModificationDate": 1777671598714,
       "contentHash": "d2fa243e766a193585b7e9bf36898d80",
@@ -196,44 +234,6 @@
       ],
       "artifacts": [
         "Strings"
-      ]
-    },
-    "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\interfaces\\draft-IERC6093.sol": {
-      "lastModificationDate": 1777671598243,
-      "contentHash": "bcc76f4747d56c28c40ae272ef3470a6",
-      "sourceName": "@openzeppelin/contracts/interfaces/draft-IERC6093.sol",
-      "solcConfig": {
-        "version": "0.8.24",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "cancun",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [],
-      "versionPragmas": [
-        ">=0.8.4"
-      ],
-      "artifacts": [
-        "IERC1155Errors",
-        "IERC20Errors",
-        "IERC721Errors"
       ]
     },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\introspection\\ERC165.sol": {
@@ -389,6 +389,45 @@
         "IERC721Metadata"
       ]
     },
+    "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\math\\Math.sol": {
+      "lastModificationDate": 1777671598603,
+      "contentHash": "5b8c6935ac52b7494df19d6feb38f5cc",
+      "sourceName": "@openzeppelin/contracts/utils/math/Math.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "cancun",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../Panic.sol",
+        "./SafeCast.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Math"
+      ]
+    },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\math\\SignedMath.sol": {
       "lastModificationDate": 1777671598673,
       "contentHash": "ae3528afb8bdb0a7dcfba5b115ee8074",
@@ -499,45 +538,6 @@
       ],
       "artifacts": [
         "SafeCast"
-      ]
-    },
-    "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\math\\Math.sol": {
-      "lastModificationDate": 1777671598603,
-      "contentHash": "5b8c6935ac52b7494df19d6feb38f5cc",
-      "sourceName": "@openzeppelin/contracts/utils/math/Math.sol",
-      "solcConfig": {
-        "version": "0.8.24",
-        "settings": {
-          "optimizer": {
-            "enabled": true,
-            "runs": 200
-          },
-          "evmVersion": "cancun",
-          "outputSelection": {
-            "*": {
-              "*": [
-                "abi",
-                "evm.bytecode",
-                "evm.deployedBytecode",
-                "evm.methodIdentifiers",
-                "metadata"
-              ],
-              "": [
-                "ast"
-              ]
-            }
-          }
-        }
-      },
-      "imports": [
-        "../Panic.sol",
-        "./SafeCast.sol"
-      ],
-      "versionPragmas": [
-        "^0.8.20"
-      ],
-      "artifacts": [
-        "Math"
       ]
     },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\Panic.sol": {
@@ -801,8 +801,8 @@
       "artifacts": []
     },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\contracts\\solidity\\PromptHubMarketplace.sol": {
-      "lastModificationDate": 1777647170349,
-      "contentHash": "09d14dabaa09eb1b1ba26d5f6f44896c",
+      "lastModificationDate": 1777815768845,
+      "contentHash": "39088f9dee76688e4e33a4b0cea53632",
       "sourceName": "contracts/solidity/PromptHubMarketplace.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -832,13 +832,50 @@
         "@openzeppelin/contracts/token/ERC721/ERC721.sol",
         "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol",
         "@openzeppelin/contracts/access/Ownable.sol",
-        "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "./interfaces/IAgentRegistry.sol"
       ],
       "versionPragmas": [
         "^0.8.24"
       ],
       "artifacts": [
         "PromptHubMarketplace"
+      ]
+    },
+    "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\contracts\\solidity\\interfaces\\IAgentRegistry.sol": {
+      "lastModificationDate": 1777815758002,
+      "contentHash": "176d60afce5aafa3a8452ed8c1a8dbb0",
+      "sourceName": "contracts/solidity/interfaces/IAgentRegistry.sol",
+      "solcConfig": {
+        "version": "0.8.24",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "cancun",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": [
+        "IAgentRegistry"
       ]
     },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
@@ -916,8 +953,8 @@
       ]
     },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\contracts\\solidity\\PromptHubEscrowHire.sol": {
-      "lastModificationDate": 1777647142939,
-      "contentHash": "c72ef4275a6c33892e71750e46dac909",
+      "lastModificationDate": 1777815764275,
+      "contentHash": "217f7cb831560f0561c156b2051ef943",
       "sourceName": "contracts/solidity/PromptHubEscrowHire.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -945,7 +982,8 @@
       },
       "imports": [
         "@openzeppelin/contracts/access/Ownable.sol",
-        "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "./interfaces/IAgentRegistry.sol"
       ],
       "versionPragmas": [
         "^0.8.24"
@@ -955,8 +993,8 @@
       ]
     },
     "D:\\hackathon\\prompthub-0g\\Prompthub-smartcontract\\contracts\\solidity\\PromptHubContests.sol": {
-      "lastModificationDate": 1777647146372,
-      "contentHash": "945b310360c204242983f0c1b239d006",
+      "lastModificationDate": 1777815770971,
+      "contentHash": "a4d228313d31a4acd2dde5e42ab508f0",
       "sourceName": "contracts/solidity/PromptHubContests.sol",
       "solcConfig": {
         "version": "0.8.24",
@@ -984,7 +1022,8 @@
       },
       "imports": [
         "@openzeppelin/contracts/access/Ownable.sol",
-        "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "./interfaces/IAgentRegistry.sol"
       ],
       "versionPragmas": [
         "^0.8.24"

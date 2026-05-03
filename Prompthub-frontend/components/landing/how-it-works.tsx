@@ -106,7 +106,7 @@ export function HowItWorks() {
               {" // "} HOW IT WORKS {""}
             </span>
           </div>
-          <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-4 italic">
+          <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-4 italic">
             THREE SIMPLE <span className="text-slate-800 dark:text-white/90">STEPS</span>
           </h2>
           <p className="text-slate-500 dark:text-white/40 text-sm tracking-widest uppercase font-bold">

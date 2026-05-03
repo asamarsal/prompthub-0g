@@ -146,7 +146,7 @@ export function PromptShowcaseFullscreen() {
                     </div>
 
                     {/* Title */}
-                    <h2 className="text-4xl md:text-6xl font-extrabold text-white uppercase tracking-tight leading-tight mb-4 drop-shadow-[0_2px_24px_rgba(0,0,0,0.8)]">
+                    <h2 className="text-2xl sm:text-4xl md:text-6xl font-extrabold text-white uppercase tracking-tight leading-tight mb-4 drop-shadow-[0_2px_24px_rgba(0,0,0,0.8)]">
                         {prompt.title}
                     </h2>
 
@@ -181,21 +181,21 @@ export function PromptShowcaseFullscreen() {
                     </div>
 
                     {/* CTA */}
-                    <div className="flex items-center gap-5 flex-wrap">
-                        <span className="text-4xl font-extrabold font-mono" style={{ color: accent }}>
-                            {prompt.price} <span className="text-2xl text-white/60">{prompt.currency}</span>
+                    <div className="flex items-center gap-3 sm:gap-5 flex-wrap">
+                        <span className="text-2xl sm:text-4xl font-extrabold font-mono" style={{ color: accent }}>
+                            {prompt.price} <span className="text-lg sm:text-2xl text-white/60">{prompt.currency}</span>
                         </span>
                         <Link
                             href={`/prompt/${prompt.id}`}
-                            className="inline-flex items-center gap-2 px-8 py-3 font-bold uppercase text-base tracking-wider text-white border-2 transition-all hover:-translate-y-0.5"
+                            className="inline-flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 font-bold uppercase text-sm sm:text-base tracking-wider text-white border-2 transition-all hover:-translate-y-0.5"
                             style={{
                                 borderColor: accent,
                                 background: `${accent}28`,
-                                boxShadow: `5px 5px 0 0 ${accent}`,
+                                boxShadow: `4px 4px 0 0 ${accent}`,
                                 backdropFilter: "blur(8px)",
                             }}
                         >
-                            <ShoppingCart className="w-5 h-5" /> Buy Prompt
+                            <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" /> Buy Prompt
                         </Link>
                         <Link
                             href="/marketplace"

@@ -17,6 +17,7 @@ export const MARKETPLACE_ABI = [
   "function relistPrompt(uint256 tokenId, uint256 newPrice)",
   "function updatePrice(uint256 tokenId, uint256 newPrice)",
   "function delistPrompt(uint256 tokenId)",
+  "function rateCreator(uint256 tokenId, uint256 rating)",
 ] as const;
 
 export const CONTESTS_ABI = [

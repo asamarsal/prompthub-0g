@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./interfaces/IAgentRegistry.sol";
 
 /**
  * @title PromptHubMarketplace
@@ -17,6 +18,7 @@ contract PromptHubMarketplace is ERC721URIStorage, Ownable, ReentrancyGuard {
     uint256 public constant FEE_DENOMINATOR = 1000;
     uint256 public constant PLATFORM_FEE_PER_MILLE = 25; // 2.5% = 25 / 1000
     address public treasury;
+    IAgentRegistry public agentRegistry;
 
     struct Prompt {
         address creator;
@@ -63,9 +65,11 @@ contract PromptHubMarketplace is ERC721URIStorage, Ownable, ReentrancyGuard {
         address indexed updater
     );
 
-    constructor(address _treasury) ERC721("PromptHub", "PHUB") Ownable(msg.sender) {
+    constructor(address _treasury, address _agentRegistry) ERC721("PromptHub", "PHUB") Ownable(msg.sender) {
         require(_treasury != address(0), "Invalid treasury");
+        require(_agentRegistry != address(0), "Invalid registry");
         treasury = _treasury;
+        agentRegistry = IAgentRegistry(_agentRegistry);
     }
 
     /// @notice List a new prompt for sale (mints NFT)
@@ -160,6 +164,9 @@ contract PromptHubMarketplace is ERC721URIStorage, Ownable, ReentrancyGuard {
         }
 
         emit PromptPurchased(tokenId, msg.sender, seller, p.price);
+
+        // Update creator reputation (sale = completed job)
+        try agentRegistry.updateReputation(p.creator, 0, true) {} catch {}
     }
 
     /// @notice Delist active listing (only current owner)
@@ -189,6 +196,18 @@ contract PromptHubMarketplace is ERC721URIStorage, Ownable, ReentrancyGuard {
         prompts[tokenId].price = newPrice;
         prompts[tokenId].isActive = true;
         emit PromptRelisted(tokenId, msg.sender, newPrice);
+    }
+
+    /// @notice Buyer rates a creator after purchase (on-chain review)
+    /// @param tokenId   The prompt token that was purchased
+    /// @param rating    Rating 0-50 (representing 0.0-5.0)
+    function rateCreator(uint256 tokenId, uint256 rating) external {
+        require(hasPurchased[tokenId][msg.sender], "Not purchased");
+        require(rating > 0 && rating <= 50, "Invalid rating");
+        Prompt memory p = prompts[tokenId];
+        require(p.creator != msg.sender, "Cannot rate self");
+
+        agentRegistry.updateReputation(p.creator, rating, false);
     }
 
     /// @notice Create a new immutable version pointer for prompt content/metadata (creator only)

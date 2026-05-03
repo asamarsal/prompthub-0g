@@ -646,8 +646,8 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                         )}
                                     </div>
                                     <div className="flex items-baseline">
-                                        <p className="text-4xl font-extrabold text-[#00ffff]">{typeof prompt.price === 'number' ? prompt.price : '0.000'}</p>
-                                        <span className="text-xl font-display font-bold text-white uppercase ml-2">{prompt.currency || "0G"}</span>
+                                        <p className="text-3xl sm:text-4xl font-extrabold text-[#00ffff]">{typeof prompt.price === 'number' ? prompt.price : '0.000'}</p>
+                                        <span className="text-lg sm:text-xl font-display font-bold text-white uppercase ml-2">{prompt.currency || "0G"}</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">

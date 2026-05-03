@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./interfaces/IAgentRegistry.sol";
 
 /**
  * @title PromptHubEscrowHire
@@ -15,6 +16,7 @@ contract PromptHubEscrowHire is Ownable, ReentrancyGuard {
     uint256 public constant DISPUTE_TIMEOUT_BLOCKS = 1008; // ~1 week
 
     address public treasury;
+    IAgentRegistry public agentRegistry;
     uint256 private _nextJobId = 1;
 
     enum JobStatus { PENDING, COMPLETED, REFUNDED, DISPUTED, RESOLVED }
@@ -35,9 +37,11 @@ contract PromptHubEscrowHire is Ownable, ReentrancyGuard {
     event JobDisputed(uint256 indexed jobId, address indexed disputedBy);
     event JobResolved(uint256 indexed jobId, address indexed payoutTo, uint256 amount);
 
-    constructor(address _treasury) Ownable(msg.sender) {
+    constructor(address _treasury, address _agentRegistry) Ownable(msg.sender) {
         require(_treasury != address(0), "Invalid treasury");
+        require(_agentRegistry != address(0), "Invalid registry");
         treasury = _treasury;
+        agentRegistry = IAgentRegistry(_agentRegistry);
     }
 
     /// @notice Client creates a hire job and deposits escrow
@@ -79,6 +83,9 @@ contract PromptHubEscrowHire is Ownable, ReentrancyGuard {
         }
 
         emit JobCompleted(jobId, job.artist, payout);
+
+        // Update on-chain reputation (safe — won't revert if not registered)
+        try agentRegistry.updateReputation(job.artist, 0, true) {} catch {}
     }
 
     /// @notice Client or admin refunds the job

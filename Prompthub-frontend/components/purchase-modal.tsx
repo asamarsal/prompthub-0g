@@ -108,10 +108,21 @@ export function PurchaseModal({
     if (rating === 0) return
     setSubmittingReview(true)
     try {
+      // Submit on-chain rating (1-5 stars -> scale to 10-50)
+      if (prompt.contract_id) {
+        try {
+          const marketplace = await getMarketplaceContract()
+          const tx = await marketplace.rateCreator(prompt.contract_id, rating * 10)
+          await tx.wait()
+        } catch (e) {
+          console.error("On-chain rating failed:", e)
+        }
+      }
+      
       await submitReview(String(prompt.id), rating, comment)
       setReviewSubmitted(true)
       setState("success")
-      toast.success("Review submitted!")
+      toast.success("Review submitted on-chain!")
     } catch (error) {
       console.error("Review failed:", error)
       toast.error("Failed to submit review.")

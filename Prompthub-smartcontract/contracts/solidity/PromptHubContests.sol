@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./interfaces/IAgentRegistry.sol";
 
 /**
  * @title PromptHubContests
@@ -16,6 +17,7 @@ contract PromptHubContests is Ownable, ReentrancyGuard {
     uint256 public constant MAX_TIERS = 5;
 
     address public treasury;
+    IAgentRegistry public agentRegistry;
     uint256 private _nextContestId = 1;
 
     enum ContestStatus { OPEN, COMPLETED, CANCELLED }
@@ -51,9 +53,11 @@ contract PromptHubContests is Ownable, ReentrancyGuard {
     event ContestCompleted(uint256 indexed contestId);
     event ContestCancelled(uint256 indexed contestId, uint256 refundAmount);
 
-    constructor(address _treasury) Ownable(msg.sender) {
+    constructor(address _treasury, address _agentRegistry) Ownable(msg.sender) {
         require(_treasury != address(0), "Invalid treasury");
+        require(_agentRegistry != address(0), "Invalid registry");
         treasury = _treasury;
+        agentRegistry = IAgentRegistry(_agentRegistry);
     }
 
     /// @notice Brand funds a contest with prize tiers
@@ -181,6 +185,9 @@ contract PromptHubContests is Ownable, ReentrancyGuard {
         }
 
         emit WinnerDeclared(contestId, place, winner, payout);
+
+        // Update winner reputation
+        try agentRegistry.updateReputation(winner, 0, true) {} catch {}
 
         // Auto-complete if all winners declared
         if (c.winnersDeclared >= c.numTiers) {

@@ -26,40 +26,8 @@ async function main() {
   console.log("  Address:", contracts.treasury);
   console.log("  Tx Hash:", txHashes.treasury);
 
-  // 2. Marketplace
-  console.log("\n[2/5] Deploying PromptHubMarketplace...");
-  const Marketplace = await hre.ethers.getContractFactory(
-    "PromptHubMarketplace"
-  );
-  const marketplace = await Marketplace.deploy(contracts.treasury);
-  await marketplace.waitForDeployment();
-  contracts.marketplace = await marketplace.getAddress();
-  txHashes.marketplace = marketplace.deploymentTransaction()?.hash ?? null;
-  console.log("  Address:", contracts.marketplace);
-  console.log("  Tx Hash:", txHashes.marketplace);
-
-  // 3. EscrowHire
-  console.log("\n[3/5] Deploying PromptHubEscrowHire...");
-  const Escrow = await hre.ethers.getContractFactory("PromptHubEscrowHire");
-  const escrow = await Escrow.deploy(contracts.treasury);
-  await escrow.waitForDeployment();
-  contracts.escrowHire = await escrow.getAddress();
-  txHashes.escrowHire = escrow.deploymentTransaction()?.hash ?? null;
-  console.log("  Address:", contracts.escrowHire);
-  console.log("  Tx Hash:", txHashes.escrowHire);
-
-  // 4. Contests
-  console.log("\n[4/5] Deploying PromptHubContests...");
-  const Contests = await hre.ethers.getContractFactory("PromptHubContests");
-  const contests = await Contests.deploy(contracts.treasury);
-  await contests.waitForDeployment();
-  contracts.contests = await contests.getAddress();
-  txHashes.contests = contests.deploymentTransaction()?.hash ?? null;
-  console.log("  Address:", contracts.contests);
-  console.log("  Tx Hash:", txHashes.contests);
-
-  // 5. AgentRegistry
-  console.log("\n[5/5] Deploying AgentRegistry...");
+  // 2. AgentRegistry (no deps) — MOVED UP
+  console.log("\n[2/5] Deploying AgentRegistry...");
   const Agent = await hre.ethers.getContractFactory("AgentRegistry");
   const agent = await Agent.deploy();
   await agent.waitForDeployment();
@@ -67,6 +35,47 @@ async function main() {
   txHashes.agentRegistry = agent.deploymentTransaction()?.hash ?? null;
   console.log("  Address:", contracts.agentRegistry);
   console.log("  Tx Hash:", txHashes.agentRegistry);
+
+  // 3. Marketplace (treasury + agentRegistry)
+  console.log("\n[3/5] Deploying PromptHubMarketplace...");
+  const Marketplace = await hre.ethers.getContractFactory(
+    "PromptHubMarketplace"
+  );
+  const marketplace = await Marketplace.deploy(contracts.treasury, contracts.agentRegistry);
+  await marketplace.waitForDeployment();
+  contracts.marketplace = await marketplace.getAddress();
+  txHashes.marketplace = marketplace.deploymentTransaction()?.hash ?? null;
+  console.log("  Address:", contracts.marketplace);
+  console.log("  Tx Hash:", txHashes.marketplace);
+
+  // 4. EscrowHire (treasury + agentRegistry)
+  console.log("\n[4/5] Deploying PromptHubEscrowHire...");
+  const Escrow = await hre.ethers.getContractFactory("PromptHubEscrowHire");
+  const escrow = await Escrow.deploy(contracts.treasury, contracts.agentRegistry);
+  await escrow.waitForDeployment();
+  contracts.escrowHire = await escrow.getAddress();
+  txHashes.escrowHire = escrow.deploymentTransaction()?.hash ?? null;
+  console.log("  Address:", contracts.escrowHire);
+  console.log("  Tx Hash:", txHashes.escrowHire);
+
+  // 5. Contests (treasury + agentRegistry)
+  console.log("\n[5/5] Deploying PromptHubContests...");
+  const Contests = await hre.ethers.getContractFactory("PromptHubContests");
+  const contests = await Contests.deploy(contracts.treasury, contracts.agentRegistry);
+  await contests.waitForDeployment();
+  contracts.contests = await contests.getAddress();
+  txHashes.contests = contests.deploymentTransaction()?.hash ?? null;
+  console.log("  Address:", contracts.contests);
+  console.log("  Tx Hash:", txHashes.contests);
+
+  // ── Post-Deploy Wiring ──
+  console.log("\n--- Post-Deploy: Authorizing Reputation Updaters ---");
+  await (await agent.setAuthorizedUpdater(contracts.marketplace, true)).wait();
+  console.log("  ✅ Marketplace authorized");
+  await (await agent.setAuthorizedUpdater(contracts.escrowHire, true)).wait();
+  console.log("  ✅ EscrowHire authorized");
+  await (await agent.setAuthorizedUpdater(contracts.contests, true)).wait();
+  console.log("  ✅ Contests authorized");
 
   // ── Post-deploy health checks ──
   console.log("\n--- Post-Deploy Health Checks ---");
@@ -128,6 +137,7 @@ async function main() {
     `ESCROW_CONTRACT_ADDRESS=${contracts.escrowHire}`,
     `CONTESTS_CONTRACT_ADDRESS=${contracts.contests}`,
     `TREASURY_CONTRACT_ADDRESS=${contracts.treasury}`,
+    `AGENT_REGISTRY_ADDRESS=${contracts.agentRegistry}`,
     "",
   ].join("\n");
   fs.writeFileSync(path.join(deploymentDir, `${network}.env`), envSnippet);

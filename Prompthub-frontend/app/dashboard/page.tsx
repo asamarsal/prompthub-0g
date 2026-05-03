@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { AppShell } from "@/components/app-shell"
-import { Activity, ArrowUpRight, Clock, Copy, DollarSign, Download, Eye, MoreHorizontal, Settings, TrendingUp, User, ShoppingCart, FileText, Star, Plus, BarChart3, ToggleRight, Loader2, CheckCircle } from "lucide-react"
+import { Activity, ArrowUpRight, Clock, Copy, DollarSign, Download, Eye, MoreHorizontal, Settings, TrendingUp, User, ShoppingCart, FileText, Star, Plus, BarChart3, ToggleRight, Loader2, CheckCircle, ExternalLink } from "lucide-react"
 import {
   XAxis,
   YAxis,
@@ -17,7 +17,8 @@ import { getDashboardData } from "@/lib/api"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 import { useWallet } from "@/lib/wallet-context"
 import { cn } from "@/lib/utils"
-import { checkAgentRegistered, getAgentRegistryContract } from "@/lib/evm"
+import { checkAgentRegistered, getAgentRegistryContract, getAgentReputation, type AgentReputation } from "@/lib/evm"
+import { CHAIN_CONFIG, CONTRACTS } from "@/lib/contracts"
 import { toast } from "sonner"
 
 
@@ -41,11 +42,17 @@ export default function DashboardPage() {
   const { price: ogPrice } = use0GPrice()
   const { address: walletAddress } = useWallet()
   const [agentRegistered, setAgentRegistered] = useState<boolean | null>(null)
+  const [reputation, setReputation] = useState<AgentReputation | null>(null)
   const [agentRegLoading, setAgentRegLoading] = useState(false)
 
   useEffect(() => {
     if (walletAddress) {
-      checkAgentRegistered(walletAddress).then(setAgentRegistered).catch(() => setAgentRegistered(null))
+      checkAgentRegistered(walletAddress).then(registered => {
+        setAgentRegistered(registered)
+        if (registered) {
+          getAgentReputation(walletAddress).then(setReputation)
+        }
+      }).catch(() => setAgentRegistered(null))
     }
   }, [walletAddress])
 
@@ -150,28 +157,28 @@ export default function DashboardPage() {
     <AppShell>
       <div className="mx-auto max-w-7xl px-4 py-10 lg:px-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-12">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-12">
           <div>
-            <p className="text-xs font-bold text-[#00ffff] uppercase tracking-widest mb-1.5 font-mono">{"// DASHBOARD"}</p>
-            <h1 className="text-[2.5rem] font-display font-black tracking-wider uppercase text-white leading-none mb-2">
+            <p className="text-[10px] sm:text-xs font-bold text-[#00ffff] uppercase tracking-widest mb-1.5 font-mono">{"// DASHBOARD"}</p>
+            <h1 className="text-3xl sm:text-[2.5rem] font-display font-black tracking-wider uppercase text-white leading-none mb-2">
               DASHBOARD
             </h1>
-            <p className="text-[#a78bfa] text-sm font-sans">Welcome back, creator.</p>
+            <p className="text-[#a78bfa] text-xs sm:text-sm font-sans">Welcome back, creator.</p>
           </div>
-          <div className="flex gap-8">
+          <div className="flex flex-wrap gap-4 sm:gap-8">
             <Link
               href="/create"
-              className="text-sm font-bold text-white flex items-center gap-2 hover:text-[#00ffff] transition-colors"
+              className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 hover:text-[#00ffff] transition-colors"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Create Prompt
             </Link>
-            <button className="text-sm font-bold text-white flex items-center gap-2 hover:text-[#00ffff] transition-colors">
-              <Download className="w-4 h-4" />
+            <button className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 hover:text-[#00ffff] transition-colors">
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Withdraw
             </button>
-            <button className="text-sm font-bold text-white flex items-center gap-2 hover:text-[#00ffff] transition-colors">
-              <BarChart3 className="w-4 h-4" />
+            <button className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 hover:text-[#00ffff] transition-colors">
+              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Analytics
             </button>
           </div>
@@ -206,16 +213,62 @@ export default function DashboardPage() {
         </div>
 
         {/* Agent Registration */}
-        <div className="bg-[#16161a]/60 backdrop-blur-xl border border-[#2a2a30] p-6 mb-12 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-display font-black text-[#ff2d95] uppercase tracking-widest mb-1">AI Agent Status</p>
+        <div className="bg-[#16161a]/60 backdrop-blur-xl border border-[#2a2a30] p-6 mb-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-1">
+              <p className="text-[10px] font-display font-black text-[#ff2d95] uppercase tracking-widest">AI Agent Status</p>
+              {reputation?.verified && (
+                <span className="bg-[#b4ff39] text-black text-[9px] font-black px-1.5 py-0.5 rounded-sm">VERIFIED BY GOV</span>
+              )}
+            </div>
             <p className="text-sm text-[#a78bfa]">Register on-chain to enable agent-to-agent interactions and build reputation.</p>
+            
+            {reputation && (
+              <div className="flex gap-6 mt-4 pt-4 border-t border-white/5">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-[#a78bfa]/50 font-mono uppercase tracking-wider">On-Chain Rating</span>
+                  <span className="text-white font-bold flex items-center gap-1.5">
+                    <Star className="w-3 h-3 text-[#ffb800] fill-[#ffb800]" />
+                    {reputation.totalReviews > 0 ? (reputation.avgRating / 10).toFixed(1) : "0.0"}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-[#a78bfa]/50 font-mono uppercase tracking-wider">Jobs Completed</span>
+                  <span className="text-white font-bold">{reputation.completedJobs}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-[#a78bfa]/50 font-mono uppercase tracking-wider">Reviews</span>
+                  <span className="text-white font-bold">{reputation.totalReviews}</span>
+                </div>
+              </div>
+            )}
           </div>
           {agentRegistered === true ? (
-            <span className="shrink-0 flex items-center gap-2 text-sm font-extrabold text-[#b4ff39] border border-[#b4ff39]/30 bg-[#b4ff39]/10 px-4 py-2">
-              <CheckCircle className="w-4 h-4" />
-              Registered ✓
-            </span>
+            <div className="shrink-0 flex flex-col items-end gap-2">
+              <span className="flex items-center gap-2 text-sm font-extrabold text-[#b4ff39] border border-[#b4ff39]/30 bg-[#b4ff39]/10 px-4 py-2">
+                <CheckCircle className="w-4 h-4" />
+                Registered ✓
+              </span>
+              <div className="flex flex-col items-end gap-1">
+                <a 
+                  href={`${CHAIN_CONFIG.explorer}/address/${walletAddress}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-[#a78bfa]/60 hover:text-[#00ffff] flex items-center gap-1 transition-colors"
+                >
+                  AGENT ID: {walletAddress?.slice(0, 10)}...
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+                <a 
+                  href={`${CHAIN_CONFIG.explorer}/address/${CONTRACTS.agentRegistry}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-[#ff2d95]/60 hover:text-[#ff2d95] flex items-center gap-1 transition-colors underline underline-offset-2"
+                >
+                  View Registry Contract
+                </a>
+              </div>
+            </div>
           ) : (
             <button
               onClick={handleRegisterAgent}
