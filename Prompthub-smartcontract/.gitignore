@@ -3,6 +3,9 @@
 .cache/**
 history.txt
 
+.env
+.env.*
+.env.local
 logs
 *.log
 npm-debug.log*
