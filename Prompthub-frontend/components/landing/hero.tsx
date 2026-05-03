@@ -109,7 +109,7 @@ export function Hero() {
               href="https://github.com/asamarsal/Prompthub"
               target="_blank"
               rel="noopener noreferrer"
-              className="neo-btn-secondary w-full md:w-auto text-sm group text-primary border-primary/30 hover:border-primary inline-flex items-center justify-center p-4"
+              className="w-full md:w-auto text-sm group inline-flex items-center justify-center p-4 font-display font-bold uppercase tracking-wider text-[#ffe8f6] border-2 border-[#ff4fd8]/80 bg-[rgba(255,79,216,0.12)] backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_0_14px_rgba(255,79,216,0.45)] transition-all duration-200 hover:bg-[rgba(255,79,216,0.22)] hover:border-[#ff7ae6] hover:text-white hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_22px_rgba(255,79,216,0.75)]"
             >
               Read Docs
             </a>

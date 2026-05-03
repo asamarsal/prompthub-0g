@@ -1,40 +1,31 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { Shield, Repeat, BadgeCheck, Zap } from "lucide-react"
 
 const features = [
   {
-    icon: Shield,
+    icon: "/icon/features/0g-security.png",
     title: "0G Security",
     description:
       "Every transaction is secured by 0G, the most trusted blockchain. Your prompts are protected by the strongest proof-of-work network.",
-    color: "from-[#ff6b2b] to-[#ff2d95]",
-    accent: "#ff6b2b",
   },
   {
-    icon: Repeat,
+    icon: "/icon/features/auto-royalties.png",
     title: "Auto Royalties",
     description:
       "Set your royalty percentage and earn from every resale. Smart contracts automatically distribute payments to original creators.",
-    color: "from-[#ff2d95] to-[#a855f7]",
-    accent: "#ff2d95",
   },
   {
-    icon: BadgeCheck,
+    icon: "/icon/features/verified-ownership.png",
     title: "Verified Ownership",
     description:
       "On-chain verification ensures provenance and authenticity. Each prompt purchase is recorded immutably on the 0G blockchain.",
-    color: "from-[#00ffff] to-[#a855f7]",
-    accent: "#00ffff",
   },
   {
-    icon: Zap,
+    icon: "/icon/features/instant-settlement.png",
     title: "Instant Settlement",
     description:
       "0G payments settle in minutes, not days. No intermediaries, no chargebacks. Direct peer-to-peer transactions.",
-    color: "from-[#b4ff39] to-[#00ffff]",
-    accent: "#b4ff39",
   },
 ]
 
@@ -121,16 +112,12 @@ export function Features() {
             <div
               key={feature.title}
               className="group bg-card border-2 border-border p-6 transition-all duration-200 hover:-translate-x-1 hover:-translate-y-1 cursor-default"
-              style={{ boxShadow: `2px 2px 0 0 ${feature.accent}40` }}
-              onMouseEnter={e => (e.currentTarget.style.boxShadow = `6px 6px 0 0 ${feature.accent}`)}
-              onMouseLeave={e => (e.currentTarget.style.boxShadow = `2px 2px 0 0 ${feature.accent}40`)}
             >
-              <div className={`relative w-14 h-14 bg-gradient-to-br ${feature.color} flex items-center justify-center mb-5 border-2 border-white/10`}>
-                <feature.icon className="w-7 h-7 text-white" />
+              <div className="mb-6">
+                <img src={feature.icon} alt={feature.title} className="w-16 h-16 object-contain" />
               </div>
               <h3 className="text-base font-extrabold text-[#e0d4ff] mb-2 uppercase tracking-wider">{feature.title}</h3>
               <p className="text-sm text-[#a78bfa] leading-relaxed">{feature.description}</p>
-              <div className="mt-5 h-0.5 w-10" style={{ background: feature.accent }} />
             </div>
           ))}
         </div>
