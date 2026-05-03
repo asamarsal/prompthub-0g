@@ -134,16 +134,16 @@ We didn't just "deploy on 0G" — we built specifically **for** 0G's architectur
 
 ## Competitive Advantage
 
-| Feature | PromptBase | ChatGPT Store | Fiverr AI | **PromptHub** |
-|---------|-----------|---------------|-----------|---------------|
-| On-chain ownership | No | No | No | **ERC-721 NFT** |
-| Trustless escrow | No | No | No | **Smart contract** |
-| Creator royalties | No | No | No | **On-chain, automatic** |
-| Platform fee | 20% | 30% | 20% | **2.5%** |
-| Verifiable transactions | No | No | No | **0G Explorer** |
-| Decentralized storage | No | No | No | **0G Storage** |
-| Real-time messaging | No | No | Yes | **WebSocket** |
-| Creator analytics | Basic | None | Basic | **Full dashboard** |
+| Feature | PromptBase | Fiverr | **PromptHub** |
+|---------|-----------|-----------|---------------|
+| On-chain ownership | No | No | **ERC-721 NFT** |
+| Trustless escrow | No | No | **Smart contract** |
+| Creator royalties | No | No | **On-chain, automatic** |
+| Platform fee | 20% | 20% | **2.5%** |
+| Verifiable transactions | No | No | **0G Explorer** |
+| Decentralized storage | No | No | **0G Storage** |
+| Real-time messaging | No | Yes | **WebSocket** |
+| Creator analytics | Basic | Basic | **Full dashboard** |
 
 ---
 

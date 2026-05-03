@@ -59,10 +59,10 @@ export function Navigation() {
         <div className="mx-auto flex h-16 items-center justify-between px-4 lg:px-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group shrink-0" aria-label="PromptHub Home">
-            <img 
-              src={mounted && resolvedTheme === "light" ? "/icon/prompthub-logo-black.png" : "/icon/prompthub-logo.png"} 
-              alt="PromptHub Logo" 
-              className="h-8 max-w-[200px] w-auto object-contain" 
+            <img
+              src={mounted && resolvedTheme === "light" ? "/icon/prompthub-logo-black.png" : "/icon/prompthub-logo.png"}
+              alt="PromptHub Logo"
+              className="h-8 max-w-[200px] w-auto object-contain"
             />
           </Link>
 
@@ -275,7 +275,7 @@ export function Navigation() {
                       </button>
                       <button
                         onClick={() => { disconnect(); setShowDropdown(false) }}
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-[#ff2d95] hover:bg-[#ff2d95]/10 transition-colors text-left"
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold !text-white bg-[#ff2d95] hover:bg-[#e32784] dark:text-[#ffffff] dark:bg-transparent dark:hover:bg-[#ff2d95]/10 transition-colors text-left"
                       >
                         <X className="w-4 h-4" /> Disconnect
                       </button>
@@ -286,10 +286,10 @@ export function Navigation() {
             ) : (
               <button
                 onClick={() => connect()}
-                className="flex items-center gap-2 px-4 py-2 bg-[#121214] border border-[#222] hover:border-[#a855f7] transition-all text-sm font-bold text-white group"
+                className="flex items-center gap-2 px-4 py-2 border transition-all text-sm font-bold group bg-white text-slate-900 border-sky-300 hover:border-sky-500 hover:bg-sky-50 dark:bg-[#121214] dark:border-[#222] dark:hover:border-[#a855f7] dark:text-white"
                 aria-label="Connect 0G Wallet"
               >
-                <Wallet className="w-4 h-4 text-white/50 group-hover:text-[#a855f7] transition-colors" />
+                <Wallet className="w-4 h-4 text-sky-600 group-hover:text-sky-700 dark:text-white/50 dark:group-hover:text-[#a855f7] transition-colors" />
                 Connect Wallet
               </button>
             )}
@@ -352,7 +352,7 @@ export function Navigation() {
                   <button onClick={() => { disconnect(); setMobileOpen(false) }} className="text-xs font-bold text-[#ff2d95] text-left py-1 uppercase tracking-widest transition-colors">Disconnect</button>
                 </div>
               ) : (
-                <button onClick={() => { setMobileOpen(false); connect() }} className="flex items-center gap-3 px-4 py-3 text-sm font-display font-bold tracking-widest text-muted-foreground hover:text-white uppercase transition-colors w-full text-left">
+                <button onClick={() => { setMobileOpen(false); connect() }} className="flex items-center gap-3 px-4 py-3 text-sm font-display font-bold tracking-widest text-slate-700 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white uppercase transition-colors w-full text-left">
                   <Wallet className="w-4 h-4" /> Connect Wallet
                 </button>
               )}
