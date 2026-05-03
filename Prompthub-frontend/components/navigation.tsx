@@ -62,7 +62,7 @@ export function Navigation() {
             <img
               src={mounted && resolvedTheme === "light" ? "/icon/prompthub-logo-black.png" : "/icon/prompthub-logo.png"}
               alt="PromptHub Logo"
-              className="h-8 max-w-[200px] w-auto object-contain"
+              className="h-10 md:h-8 max-w-[200px] w-auto object-contain"
             />
           </Link>
 
