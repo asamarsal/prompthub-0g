@@ -91,29 +91,7 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 
 ## How It Works
 
-```
-Creator                          0G Blockchain                    Buyer
-  │                                   │                             │
-  │── 1. Upload prompt + metadata ──► │                             │
-  │   (encrypted, stored on 0G        │                             │
-  │    Storage / IPFS)                 │                             │
-  │                                    │                             │
-  │── 2. Mint as ERC-721 NFT ───────► │                             │
-  │   (PromptHubMarketplace.sol)       │                             │
-  │                                    │ ◄── 3. Browse & purchase ──│
-  │                                    │     (pay in 0G tokens)      │
-  │                                    │                             │
-  │                                    │── 4. Transfer NFT ────────► │
-  │                                    │     ownership on-chain      │
-  │                                    │                             │
-  │                                    │     5. Backend verifies ────│
-  │                                    │        via RPC call         │
-  │                                    │                             │
-  │ ◄── 6. Royalty received            │── 7. Decrypt & deliver ───► │
-  │     (auto, from contract)          │     prompt content          │
-  │                                    │                             │
-  │   All transactions visible on 0G Explorer                        │
-```
+![How It Works](Prompthub-frontend/public/readme/howitworks.png)
 
 ---
 
