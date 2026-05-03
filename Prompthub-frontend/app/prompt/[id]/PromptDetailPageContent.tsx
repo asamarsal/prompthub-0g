@@ -9,7 +9,8 @@ import { prompts as mockPrompts } from "@/lib/mock-data"
 import { ChevronRight, Check, Copy, Heart, Share2, Star, ExternalLink, Zap, Lock, BadgeCheck, Clock, Unlock, Loader2, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt } from "@/lib/api"
+import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, getSimilarPrompts } from "@/lib/api"
+import { SimilarPrompts } from "@/components/similar-prompts"
 import { useWallet } from "@/lib/wallet-context"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 import { getMarketplaceContract } from "@/lib/evm"
@@ -906,7 +907,21 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                         >
                                             <span className="flex items-center gap-2">
                                                 <ExternalLink className="w-3 h-3" />
-                                                0G Explorer
+                                                0G Chain Tx
+                                            </span>
+                                            <ChevronRight className="w-3 h-3 opacity-30 group-hover:opacity-100" />
+                                        </a>
+                                    )}
+                                    {prompt.rootHash && (
+                                        <a
+                                            href={`${CHAIN_CONFIG.explorer}/address/0x22E03a6A89B950F1c82ec5e74F8eCa321a105296`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center justify-between text-[10px] font-bold text-[#a78bfa] hover:text-[#b4ff39] uppercase tracking-widest transition-colors group"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <ExternalLink className="w-3 h-3" />
+                                                0G Storage (Flow Contract)
                                             </span>
                                             <ChevronRight className="w-3 h-3 opacity-30 group-hover:opacity-100" />
                                         </a>
@@ -941,6 +956,9 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                         </div>
                     </section>
                 )}
+
+                {/* AI-Powered Similar Prompts */}
+                {prompt && <SimilarPrompts promptId={String(prompt.id)} />}
             </div>
 
             <PurchaseModal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} prompt={prompt} />

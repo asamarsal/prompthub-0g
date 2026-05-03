@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\WatermarkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -166,7 +167,8 @@ class FileController extends Controller
         $groupId = $request->input('group_id');
         
         try {
-            // Store in storage/app/public/prompt/{group_id} if provided
+            // 1. Store locally as cache for fast serving
+            // (0G Storage upload is handled by frontend using official 0G TS SDK)
             $path = "prompt";
             if ($groupId) {
                 $path .= "/" . $groupId;
@@ -176,12 +178,29 @@ class FileController extends Controller
             $fileName = time() . '_' . uniqid() . '.' . $extension;
             
             $storedPath = $file->storeAs($path, $fileName, 'public');
-            $url = asset('storage/' . $storedPath);
+            $localUrl = asset('storage/' . $storedPath);
+
+            // 2. Apply watermark to image files for public preview
+            $watermarkedUrl = null;
+            $watermarkService = new WatermarkService();
+            $mimeType = $file->getMimeType() ?? '';
+
+            if ($watermarkService->isImageFile($mimeType)) {
+                $originalFullPath = storage_path('app/public/' . $storedPath);
+                $watermarkedFileName = 'wm_' . $fileName;
+                $watermarkedStoredPath = $path . '/' . $watermarkedFileName;
+                $watermarkedFullPath = storage_path('app/public/' . $watermarkedStoredPath);
+
+                if ($watermarkService->apply($originalFullPath, $watermarkedFullPath)) {
+                    $watermarkedUrl = asset('storage/' . $watermarkedStoredPath);
+                }
+            }
 
             return response()->json([
-                'url' => $url,
+                'url' => $localUrl,
+                'watermarked_url' => $watermarkedUrl,
                 'path' => $storedPath,
-                'name' => $file->getClientOriginalName()
+                'name' => $file->getClientOriginalName(),
             ]);
 
         } catch (\Exception $e) {

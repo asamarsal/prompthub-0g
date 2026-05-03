@@ -14,29 +14,34 @@ const COINGECKO_URL = `https://api.coingecko.com/api/v3/simple/price?ids=${encod
 
 /**
  * Fetches the current 0G price in USD from CoinGecko.
- * Returns a fallback of 2.5 if the request fails.
+ * Returns a fallback of 0.50 if the request fails (0G is currently below $1).
  */
 export async function fetch0GPrice(): Promise<number> {
+    const FALLBACK_PRICE = 0.50 // Realistic fallback — 0G is currently below $1
     try {
         const apiKey = process.env.NEXT_PUBLIC_COINGECKO_API_KEY
         const url = apiKey
-            ? `${COINGECKO_URL}&x_cg_pro_api_key=${apiKey}`
+            ? `${COINGECKO_URL}&x_cg_demo_api_key=${apiKey}`
             : COINGECKO_URL
 
-        const res = await fetch(url)
-        const data = await res.json()
+        const res = await fetch(url, { next: { revalidate: 300 } }) // Cache 5 min
+        if (!res.ok) {
+            console.warn(`CoinGecko returned HTTP ${res.status}, using fallback price.`)
+            return FALLBACK_PRICE
+        }
 
+        const data = await res.json()
         const coin = data?.[COINGECKO_COIN_ID]
-        if (coin && typeof coin.usd === "number") {
+        if (coin && typeof coin.usd === "number" && coin.usd > 0) {
             return coin.usd
         }
 
         console.warn(`CoinGecko response missing ${COINGECKO_COIN_ID}.usd, using fallback.`)
-        return 2.5
+        return FALLBACK_PRICE
     } catch (err) {
         // Suppress console.error so it doesn't trigger the Next.js dev error overlay
-        console.warn("CoinGecko API blocked or offline. Using fallback 0G price: $2.5")
-        return 2.5 // Fallback
+        console.warn("CoinGecko API blocked or offline. Using fallback 0G price.")
+        return FALLBACK_PRICE
     }
 }
 
@@ -466,6 +471,46 @@ export async function createPrompt(data: any): Promise<any> {
         method: "POST",
         body: JSON.stringify(data),
     });
+}
+
+// ─── AI Recommendations ───────────────────────────────────────────────────
+
+/**
+ * GET /api/prompts/{id}/similar
+ * Returns similar/recommended prompts based on AI analysis.
+ */
+export async function getSimilarPrompts(id: string): Promise<{ data: any[]; count: number }> {
+    return request<{ data: any[]; count: number }>(`/api/prompts/${id}/similar`)
+}
+
+// ─── Plagiarism Detection ─────────────────────────────────────────────────
+
+export interface PlagiarismResult {
+    is_plagiarized: boolean
+    similarity_score: number
+    reasoning: string
+    similar_prompts: {
+        id: string
+        title: string
+        category: string
+        creator: string
+        match_type: "keyword" | "semantic"
+    }[]
+}
+
+/**
+ * POST /api/prompts/check-plagiarism
+ * Checks if a prompt is too similar to existing prompts.
+ */
+export async function checkPlagiarism(data: {
+    title: string
+    description: string
+    content?: string
+}): Promise<PlagiarismResult> {
+    return request<PlagiarismResult>("/api/prompts/check-plagiarism", {
+        method: "POST",
+        body: JSON.stringify(data),
+    })
 }
 
 /**

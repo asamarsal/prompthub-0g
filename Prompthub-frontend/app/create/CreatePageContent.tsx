@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { AppShell } from "@/components/app-shell"
-import { Upload, Check, ChevronRight, ChevronLeft, FileText, Lightbulb, X, Loader2, ExternalLink } from "lucide-react"
+import { Upload, Check, ChevronRight, ChevronLeft, FileText, Lightbulb, X, Loader2, ExternalLink, AlertTriangle, ImagePlus, ShieldCheck } from "lucide-react"
 import { categories as allCategories, models as allModels } from "@/lib/mock-data"
-import { createPrompt, uploadMetadata, uploadPromptAsset, uploadTo0GStorage } from "@/lib/api"
+import { createPrompt, uploadMetadata, uploadPromptAsset, checkPlagiarism } from "@/lib/api"
+import { uploadTo0GStorageNetwork, getStorageTxExplorerUrl } from "@/lib/zero-g-storage"
 import { useWallet } from "@/lib/wallet-context"
 import { parseEther } from "ethers"
 import { getMarketplaceContract } from "@/lib/evm"
@@ -57,6 +58,7 @@ interface FormData {
   isNsfw: boolean
   currency: "0G"
   additionalLinks: { label: string, url: string }[]
+  referenceImages: File[]
 }
 
 export default function CreatePageContent() {
@@ -67,6 +69,8 @@ export default function CreatePageContent() {
   const [deployed, setDeployed] = useState(false)
   const [deployedTxId, setDeployedTxId] = useState<string | null>(null)
   const [deployedMetadataCID, setDeployedMetadataCID] = useState<string | null>(null)
+  const [deployedStorageHash, setDeployedStorageHash] = useState<string | null>(null)
+  const [deployedStorageTxHash, setDeployedStorageTxHash] = useState<string | null>(null)
   const [isVerified, setIsVerified] = useState(true) // Mock state to demonstrate different roles
   const { price: ogPrice } = use0GPrice()
   const [form, setForm] = useState<FormData>({
@@ -86,9 +90,12 @@ export default function CreatePageContent() {
     isNsfw: false,
     currency: "0G",
     additionalLinks: [],
+    referenceImages: [],
   })
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [plagiarismResult, setPlagiarismResult] = useState<any>(null)
+  const [plagiarismChecking, setPlagiarismChecking] = useState(false)
 
   useEffect(() => {
     if (form.previewImageFile) {
@@ -123,20 +130,20 @@ export default function CreatePageContent() {
       setDeploying(true)
       const groupId = crypto.randomUUID().split("-")[0] // Short unique ID
 
-      // 0. Upload Preview Image if in upload mode
+      // 0. Upload Preview Image to backend (local cache for fast display)
       let finalPreviewUrl = form.previewImageUrl
+      let watermarkedPreviewUrl = ""
       if (form.previewMode === "upload" && form.previewImageFile) {
-        console.log("Uploading preview image to local storage folder:", groupId)
+        console.log("Uploading preview image to backend cache...")
         const previewRes = await uploadPromptAsset(form.previewImageFile, groupId)
         finalPreviewUrl = previewRes.url
-        console.log("Preview image uploaded to local, URL:", finalPreviewUrl)
+        watermarkedPreviewUrl = (previewRes as any).watermarked_url || ""
       }
 
-      // 1. Upload the real Prompt Content to local storage + 0G hash bridge
-      console.log("Uploading prompt files to local storage folder:", groupId)
-      const uploadedFiles: { name: string, url: string, size: number, type: string }[] = []
+      // 1. Upload prompt files to backend (local cache) + extract text
+      console.log("Uploading prompt files to backend cache...")
+      const uploadedFiles: { name: string, url: string, size: number, type: string, root_hash?: string }[] = []
       let combinedContent = ""
-      let storageRootHash = ""
 
       for (let i = 0; i < form.files.length; i++) {
         const f = form.files[i]
@@ -145,18 +152,10 @@ export default function CreatePageContent() {
           name: f.name,
           url: uploadRes.url,
           size: f.size,
-          type: f.type
+          type: f.type,
         })
-        if (i === 0) {
-          try {
-            const storageRes = await uploadTo0GStorage(f, "content")
-            storageRootHash = storageRes.rootHash
-          } catch (err) {
-            console.warn("0G storage bridge failed, fallback to metadata CID later", err)
-          }
-        }
 
-        // Extract text for first few text-based files to show in preview/DB
+        // Extract text for text-based files to store in DB
         if ((form.contentType === "TEXT" || form.contentType === "CODE") && combinedContent.length < 5000) {
           try {
             const text = await f.text()
@@ -167,9 +166,41 @@ export default function CreatePageContent() {
         }
       }
 
+      // Upload reference images to backend cache
+      const refImageUrls: string[] = []
+      for (const refImg of form.referenceImages) {
+        try {
+          const refRes = await uploadPromptAsset(refImg, groupId)
+          refImageUrls.push(refRes.url)
+        } catch (err) {
+          console.warn("Reference image upload failed, skipping...", err)
+        }
+      }
+
+      // 2. Upload FIRST prompt file to 0G Storage Network (decentralized)
+      // Uses official 0G TypeScript SDK — creates on-chain tx to Flow contract
+      let storageRootHash = ""
+      let storageTxHash = ""
+      console.log("Uploading to 0G Storage Network via SDK...")
+      try {
+        const zgResult = await uploadTo0GStorageNetwork(form.files[0])
+        if (zgResult.success && zgResult.rootHash) {
+          storageRootHash = zgResult.rootHash
+          storageTxHash = zgResult.txHash
+          if (uploadedFiles.length > 0) {
+            uploadedFiles[0].root_hash = zgResult.rootHash
+          }
+          console.log("0G Storage SUCCESS! rootHash:", zgResult.rootHash, "txHash:", zgResult.txHash)
+        } else {
+          console.warn("0G Storage upload failed:", zgResult.error, "— will use metadata CID as fallback")
+        }
+      } catch (zgErr) {
+        console.warn("0G Storage SDK error, continuing without decentralized storage:", zgErr)
+      }
+
       const promptUrl = uploadedFiles.length > 0 ? uploadedFiles[0].url : ""
 
-      // 2. Upload NFT Metadata to IPFS
+      // 3. Upload NFT Metadata to IPFS (Pinata)
       const metadataRes = await uploadMetadata({
         name: form.title,
         description: form.description,
@@ -179,18 +210,20 @@ export default function CreatePageContent() {
           model: form.model,
           content_type: form.contentType,
           prompt_url: promptUrl,
-          files: uploadedFiles, // Store all file info in metadata
+          files: uploadedFiles,
           license: form.license,
           royalty: form.royalty,
           additional_info: form.additionalLinks.filter(l => l.url.trim() !== ""),
           creator_name: profile.name || profile.username || "Anonymous",
-          creator_address: address || ""
+          creator_address: address || "",
+          storage_root_hash: storageRootHash,
+          reference_images: refImageUrls,
         }
       })
       const metadataCID = metadataRes.ipfs_uri
       console.log("Metadata uploaded, CID:", metadataCID)
 
-      // 3. Call Smart Contract (listPrompt)
+      // 4. Call Smart Contract (listPrompt)
       const marketplace = await getMarketplaceContract()
       const royaltyPerMille = Math.max(0, Math.min(200, Math.round(form.royalty * 10)))
       const priceWei = parseEther(String(form.price || "0"))
@@ -203,19 +236,41 @@ export default function CreatePageContent() {
         finalStorageHash
       )
       const receipt = await tx.wait()
-      const tokenId = receipt?.logs
-        ?.map((l: any) => {
-          try { return marketplace.interface.parseLog(l) } catch { return null }
-        })
-        .find((e: any) => e?.name === "PromptListed")
-        ?.args?.tokenId
+      console.log("Marketplace tx receipt:", receipt?.hash, "logs:", receipt?.logs?.length)
+      
+      let tokenId: any = null
+      if (receipt?.logs) {
+        for (const log of receipt.logs) {
+          try {
+            const parsed = marketplace.interface.parseLog({ topics: log.topics as string[], data: log.data })
+            if (parsed?.name === "PromptListed") {
+              tokenId = parsed.args?.tokenId ?? parsed.args?.[0]
+              console.log("Found PromptListed event, tokenId:", tokenId?.toString())
+              break
+            }
+          } catch {
+            // Not a marketplace event, skip
+          }
+        }
+      }
+      if (!tokenId) {
+        // Fallback: try to get totalPrompts from contract
+        try {
+          const totalPrompts = await marketplace.totalPrompts?.()
+          if (totalPrompts) {
+            tokenId = totalPrompts
+            console.log("Fallback tokenId from totalPrompts:", tokenId?.toString())
+          }
+        } catch { /* ignore */ }
+      }
 
-      // 4. Save to Backend
+      // 5. Save to Backend DB
       await createPrompt({
         title: form.title,
         description: form.description,
         price_0g: parseFloat(form.price),
         preview_image_url: finalPreviewUrl,
+        watermarked_preview_url: watermarkedPreviewUrl || null,
         cid_ipfs: metadataCID,
         ai_model: form.model,
         category: form.category,
@@ -227,15 +282,19 @@ export default function CreatePageContent() {
         og_tx_id: tx.hash,
         contract_id: tokenId ? Number(tokenId) : null,
         currency: form.currency,
+        root_hash: finalStorageHash,
+        reference_images: refImageUrls,
         additional_info: {
           links: form.additionalLinks.filter(l => l.url.trim() !== ""),
           files: uploadedFiles,
-          storage_root_hash: finalStorageHash
+          storage_root_hash: finalStorageHash,
         },
         original_content: combinedContent
       })
       setDeployedTxId(tx.hash)
       setDeployedMetadataCID(metadataCID)
+      setDeployedStorageHash(storageRootHash || null)
+      setDeployedStorageTxHash(storageTxHash || null)
       setDeployed(true)
 
     } catch (error) {
@@ -279,9 +338,20 @@ export default function CreatePageContent() {
                   <Check className="w-8 h-8 text-[#b4ff39]" />
                 </div>
                 <h2 className="text-2xl font-extrabold gradient-text-holographic mb-2">Prompt Deployed!</h2>
-                <p className="text-[#a78bfa] mb-6">Your prompt is now live on the marketplace.</p>
+                <p className="text-[#a78bfa] mb-4">Your prompt is now live on the marketplace.</p>
 
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                {/* Storage Info */}
+                {deployedStorageHash && (
+                  <div className="bg-[#0a001a] border border-[#2a2a30] p-3 mb-6 mx-auto max-w-lg text-left">
+                    <p className="text-[10px] text-[#a78bfa]/50 font-mono uppercase tracking-wider mb-1">0G Storage Root Hash (Merkle Root)</p>
+                    <p className="text-xs text-[#b4ff39] font-mono break-all select-all mb-2">{deployedStorageHash}</p>
+                    <p className="text-[10px] text-[#a78bfa]/40">
+                      This hash is the file&apos;s Merkle root on 0G Storage network. Use it to download/verify the file anytime via the 0G SDK.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
                   <a href="/marketplace" className="btn-gradient px-6 py-3 rounded-xl text-sm font-extrabold text-white">
                     View in Marketplace
                   </a>
@@ -294,7 +364,19 @@ export default function CreatePageContent() {
                       className="flex items-center gap-2 px-6 py-3 border-2 border-[#2a2a30] bg-[#16161a] hover:border-[#00ffff] rounded-xl text-xs font-bold text-[#a78bfa] hover:text-[#00ffff] transition-all"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      0G Explorer
+                      0G Chain Explorer
+                    </a>
+                  )}
+
+                  {deployedStorageTxHash && (
+                    <a
+                      href={getStorageTxExplorerUrl(deployedStorageTxHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-6 py-3 border-2 border-[#2a2a30] bg-[#16161a] hover:border-[#b4ff39] rounded-xl text-xs font-bold text-[#a78bfa] hover:text-[#b4ff39] transition-all"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      0G Storage Tx
                     </a>
                   )}
 
@@ -306,7 +388,7 @@ export default function CreatePageContent() {
                       className="flex items-center gap-2 px-6 py-3 border-2 border-[#2a2a30] bg-[#16161a] hover:border-[#ff2d95] rounded-xl text-xs font-bold text-[#a78bfa] hover:text-[#ff2d95] transition-all"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      Pinata IPFS
+                      IPFS Metadata
                     </a>
                   )}
                 </div>
@@ -573,33 +655,27 @@ export default function CreatePageContent() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label htmlFor="price" className="block text-sm font-bold text-[#e0d4ff]">Price</label>
-                        <div className="flex gap-2">
-                          {(["0G", "0G"] as const).map((curr) => (
-                            <button
-                              key={curr}
-                              onClick={() => update("currency", curr)}
-                              className={`px-3 py-1 text-[10px] font-extrabold border-2 transition-all ${form.currency === curr
-                                ? "bg-[#00ffff] border-[#00ffff] text-black shadow-[2px_2px_0_0_#fff]"
-                                : "bg-[#160f24]/60 border-[#2a2a30] text-[#a78bfa] hover:border-[#00ffff]/50"
-                                }`}
-                            >
-                              {curr}
-                            </button>
-                          ))}
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 text-[10px] font-extrabold border-2 bg-[#00ffff] border-[#00ffff] text-black shadow-[2px_2px_0_0_#fff]">
+                            0G
+                          </span>
+                          <span className="text-[10px] text-[#a78bfa]/50 font-mono">
+                            1 0G = ${ogPrice.toFixed(2)}
+                          </span>
                         </div>
                       </div>
                       <div className="relative">
                         <input
                           id="price"
                           type="number"
-                          step={form.currency === "0G" ? "0.0001" : "0.5"}
+                          step="0.0001"
                           min="0"
                           value={form.price}
                           onChange={(e) => update("price", e.target.value)}
                           className="w-full bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] focus:outline-none focus:border-[#00ffff] font-medium transition-colors"
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-[#a78bfa]/50 font-mono">
-                          ~${(Number(form.price) * (form.currency === "0G" ? 65000 : 2.5)).toFixed(2)} USD
+                          ~${(Number(form.price) * ogPrice).toFixed(2)} USD
                         </span>
                       </div>
                     </div>
@@ -721,12 +797,113 @@ export default function CreatePageContent() {
                         </div>
                       </div>
                     )}
+
+                    {/* Reference Images Section */}
+                    <div className="mt-4">
+                      <h4 className="text-xs font-bold text-[#00ffff] uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <ImagePlus className="w-4 h-4" />
+                        Reference Images (Optional)
+                      </h4>
+                      <p className="text-xs text-[#a78bfa]/50 mb-3">Add up to 4 reference images to show buyers what your prompt can generate.</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {form.referenceImages.map((f, idx) => (
+                          <div key={idx} className="relative aspect-square bg-[#160f24]/80 border border-[#2a2a30] overflow-hidden group">
+                            <img
+                              src={URL.createObjectURL(f)}
+                              alt={`Reference ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              onClick={() => update("referenceImages", form.referenceImages.filter((_, i) => i !== idx))}
+                              className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-[#ff2d95]/80 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <X className="w-3 h-3 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                        {form.referenceImages.length < 4 && (
+                          <label className="aspect-square bg-[#160f24]/60 border-2 border-dashed border-[#2a2a30] hover:border-[#00ffff] flex flex-col items-center justify-center cursor-pointer transition-all">
+                            <ImagePlus className="w-6 h-6 text-[#a78bfa]/40 mb-1" />
+                            <span className="text-[10px] text-[#a78bfa]/40">Add Image</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) update("referenceImages", [...form.referenceImages, file])
+                                e.target.value = ""
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {/* Step 3: Preview */}
                 {step === 3 && (
                   <div className="flex flex-col gap-6">
+                    {/* Plagiarism Check Banner */}
+                    <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-bold text-[#00ffff] uppercase tracking-widest flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4" />
+                          Originality Check
+                        </h4>
+                        <button
+                          onClick={async () => {
+                            setPlagiarismChecking(true)
+                            setPlagiarismResult(null)
+                            try {
+                              const result = await checkPlagiarism({
+                                title: form.title,
+                                description: form.description,
+                                content: form.files.length > 0 ? form.files[0].name : undefined,
+                              })
+                              setPlagiarismResult(result)
+                            } catch {
+                              setPlagiarismResult({ is_plagiarized: false, similarity_score: 0, reasoning: "Check unavailable — proceed with caution.", similar_prompts: [] })
+                            } finally {
+                              setPlagiarismChecking(false)
+                            }
+                          }}
+                          disabled={plagiarismChecking}
+                          className="px-3 py-1.5 text-xs font-bold bg-[#00ffff]/10 border border-[#00ffff]/30 text-[#00ffff] hover:bg-[#00ffff]/20 transition-colors disabled:opacity-50"
+                        >
+                          {plagiarismChecking ? (
+                            <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Checking...</span>
+                          ) : "Run Check"}
+                        </button>
+                      </div>
+                      {plagiarismResult && (
+                        <div className={`mt-3 p-3 border ${plagiarismResult.is_plagiarized ? "border-[#ff2d95] bg-[#ff2d95]/10" : "border-[#b4ff39] bg-[#b4ff39]/10"}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            {plagiarismResult.is_plagiarized ? (
+                              <AlertTriangle className="w-4 h-4 text-[#ff2d95]" />
+                            ) : (
+                              <ShieldCheck className="w-4 h-4 text-[#b4ff39]" />
+                            )}
+                            <span className={`text-xs font-bold ${plagiarismResult.is_plagiarized ? "text-[#ff2d95]" : "text-[#b4ff39]"}`}>
+                              {plagiarismResult.is_plagiarized ? `Potential Match Found (${Math.round(plagiarismResult.similarity_score * 100)}% similar)` : "Original Content"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#a78bfa]/70">{plagiarismResult.reasoning}</p>
+                          {plagiarismResult.similar_prompts?.length > 0 && (
+                            <div className="mt-2 flex flex-col gap-1">
+                              {plagiarismResult.similar_prompts.map((sp: any) => (
+                                <span key={sp.id} className="text-[10px] text-[#a78bfa]/50">• {sp.title} by {sp.creator} ({sp.match_type})</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {!plagiarismResult && !plagiarismChecking && (
+                        <p className="text-xs text-[#a78bfa]/40">Click &quot;Run Check&quot; to verify your prompt is original before deploying.</p>
+                      )}
+                    </div>
+
                     <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#00ffff] shadow-[6px_6px_0_0_#00ffff] p-5">
                       <h3 className="text-lg font-bold text-[#e0d4ff] mb-4">Listing <span className="gradient-text">Preview</span></h3>
                       <div className="grid grid-cols-2 gap-4 text-sm">

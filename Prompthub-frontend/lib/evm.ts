@@ -13,6 +13,7 @@ export const MARKETPLACE_ABI = [
   "function listPrompt(string metadataUri, uint256 price, uint256 royaltyPerMille, string storageHash) returns (uint256)",
   "function createPromptVersion(uint256 tokenId, string newMetadataUri, string newStorageHash)",
   "function getPromptVersionCount(uint256 tokenId) view returns (uint256)",
+  "function totalPrompts() view returns (uint256)",
   "function buyPrompt(uint256 tokenId) payable",
   "function relistPrompt(uint256 tokenId, uint256 newPrice)",
   "function updatePrice(uint256 tokenId, uint256 newPrice)",

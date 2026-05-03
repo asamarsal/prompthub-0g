@@ -32,7 +32,9 @@ class Prompt extends Model
         'og_tx_id',
         'root_hash',
         'currency',
-        'additional_info'
+        'additional_info',
+        'reference_images',
+        'watermarked_preview_url'
     ];
 
     protected $casts = [
@@ -44,7 +46,8 @@ class Prompt extends Model
         'royalty_percentage' => 'integer',
         'total_sold' => 'integer',
         'contract_id' => 'integer',
-        'additional_info' => 'array'
+        'additional_info' => 'array',
+        'reference_images' => 'array'
     ];
 
     public function user()

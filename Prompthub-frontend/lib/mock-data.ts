@@ -20,6 +20,8 @@ export interface Prompt {
   isNsfw: boolean
   isCurated: boolean
   image?: string
+  referenceImages?: string[]
+  watermarkedPreviewUrl?: string
 }
 
 export const prompts: Prompt[] = [

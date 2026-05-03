@@ -14,6 +14,8 @@ use App\Http\Controllers\AiModelController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\StorageController;
 use App\Http\Controllers\PromptScoreController;
+use App\Http\Controllers\PromptRecommendationController;
+use App\Http\Controllers\PlagiarismController;
 
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\ArtistReviewController;
@@ -35,6 +37,7 @@ Route::get('/artists', [UserController::class, 'artists']);
 Route::get('/artists/{id}/reviews', [ArtistReviewController::class, 'index']);
 Route::get('/prompts/{id}/reviews', [ReviewController::class, 'index']);
 Route::get('/prompts/{id}/transactions', [TransactionController::class, 'promptHistory']);
+Route::get('/prompts/{id}/similar', [PromptRecommendationController::class, 'similar']);
 
 // Protected routes (requires Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
@@ -67,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/prompts/{id}/price', [PromptController::class, 'updatePrice']);
     Route::get('/prompts/{id}/content', [PromptController::class, 'getContent'])->middleware('x402');
     Route::post('/prompts/{id}/score', [PromptScoreController::class, 'score']);
+    Route::post('/prompts/check-plagiarism', [PlagiarismController::class, 'check']);
 
     // Contests
     Route::post('/contests', [ContestController::class, 'store']);

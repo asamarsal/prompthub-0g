@@ -41,30 +41,54 @@ class ZeroGStorageService
                 $fileContent = file_get_contents($fullPath);
                 $encoded = base64_encode($fileContent);
 
-                // Upload data segment to 0G Storage node
-                $response = Http::timeout(30)
-                    ->post(rtrim($nodeUrl, '/') . '/api/v1/file', [
-                        'data' => $encoded,
-                        'filename' => $file->getClientOriginalName(),
-                        'mime_type' => $file->getMimeType(),
-                    ]);
+                // Try multiple 0G Storage API endpoints (different node versions)
+                $endpoints = [
+                    '/api/v1/file',
+                    '/file',
+                    '/upload',
+                ];
 
-                if ($response->successful()) {
-                    $body = $response->json();
-                    $result['rootHash'] = $body['root_hash'] ?? $body['rootHash'] ?? $result['rootHash'];
-                    $result['txHash'] = $body['tx_hash'] ?? $body['txHash'] ?? null;
-                    $result['storage'] = '0g-network';
-                    Log::info("0G Storage upload success", [
-                        'rootHash' => $result['rootHash'],
+                $uploaded = false;
+                foreach ($endpoints as $endpoint) {
+                    try {
+                        $response = Http::timeout(30)
+                            ->post(rtrim($nodeUrl, '/') . $endpoint, [
+                                'data' => $encoded,
+                                'filename' => $file->getClientOriginalName(),
+                                'mime_type' => $file->getMimeType(),
+                                'size' => $file->getSize(),
+                            ]);
+
+                        if ($response->successful()) {
+                            $body = $response->json();
+                            $result['rootHash'] = $body['root_hash'] ?? $body['rootHash'] ?? $body['hash'] ?? $result['rootHash'];
+                            $result['txHash'] = $body['tx_hash'] ?? $body['txHash'] ?? $body['tx'] ?? null;
+                            $result['storage'] = '0g-network';
+                            $uploaded = true;
+                            Log::info("0G Storage upload success via {$endpoint}", [
+                                'rootHash' => $result['rootHash'],
+                                'file' => $file->getClientOriginalName(),
+                            ]);
+                            break;
+                        }
+                    } catch (\Exception $endpointErr) {
+                        // Try next endpoint
+                        continue;
+                    }
+                }
+
+                if (!$uploaded) {
+                    // If all endpoints fail, use local SHA-256 hash as rootHash
+                    // This ensures the file is still trackable and verifiable
+                    $result['storage'] = 'local-with-hash';
+                    Log::warning("0G Storage node endpoints unavailable, using local hash as rootHash", [
+                        'nodeUrl' => $nodeUrl,
                         'file' => $file->getClientOriginalName(),
-                    ]);
-                } else {
-                    Log::warning("0G Storage upload failed, using local fallback", [
-                        'status' => $response->status(),
-                        'body' => $response->body(),
+                        'rootHash' => $result['rootHash'],
                     ]);
                 }
             } catch (\Exception $e) {
+                $result['storage'] = 'local-with-hash';
                 Log::warning("0G Storage upload exception, using local fallback: " . $e->getMessage());
             }
         } else {

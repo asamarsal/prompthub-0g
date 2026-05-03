@@ -67,6 +67,7 @@ export default function MarketplacePage() {
           description: p.description,
           price: parseFloat(p.price_0g),
           image: p.preview_image_url || 'https://images.unsplash.com/photo-1614729939124-032f0b5609ce?w=800&q=80',
+          watermarkedPreviewUrl: p.watermarked_preview_url || null,
           model: p.ai_model,
           category: p.category,
           tags: p.tags || [],

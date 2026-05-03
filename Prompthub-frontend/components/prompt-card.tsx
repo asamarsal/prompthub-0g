@@ -79,10 +79,10 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
 
         {/* Preview area with stark watermark */}
         <div className="relative h-[200px] bg-[#0a001a] flex items-center justify-center border-b border-[#2a2a30] overflow-hidden group-hover:border-[#00ffff]/30 transition-colors">
-          {/* Background Image */}
-          {prompt.image ? (
+          {/* Background Image — prefer watermarked version for public preview */}
+          {(prompt.watermarkedPreviewUrl || prompt.image) ? (
             <img
-              src={prompt.image}
+              src={prompt.watermarkedPreviewUrl || prompt.image}
               alt={prompt.title}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => {

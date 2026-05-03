@@ -124,6 +124,8 @@ class PromptController extends Controller
             'currency' => 'nullable|string|in:0G,0G',
             'additional_info' => 'nullable|array',
             'original_content' => 'nullable|string',
+            'reference_images' => 'nullable|array',
+            'watermarked_preview_url' => 'nullable|string',
         ]);
         
         $validated['id'] = (string) \Illuminate\Support\Str::uuid();
