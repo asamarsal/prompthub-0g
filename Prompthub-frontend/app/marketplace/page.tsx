@@ -74,7 +74,7 @@ export default function MarketplacePage() {
           creatorName: p.user?.name || (p.user?.wallet_address ? `${p.user.wallet_address.slice(0, 4)}...${p.user.wallet_address.slice(-4)}` : "Artist"),
           sales: p.total_sold,
           currency: p.currency || "0G",
-          rating: 4.5, // Mock rating
+          rating: p.average_rating ?? 0,
           isCurated: p.is_curated,
           isNsfw: p.is_nsfw,
           isBookmarked: !!p.is_bookmarked,

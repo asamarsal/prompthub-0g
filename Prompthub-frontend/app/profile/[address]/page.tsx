@@ -150,7 +150,7 @@ function ProfileContent({ params }: { params: { address: string } }) {
                         creatorName: p.user?.name || (p.user?.wallet_address ? `${p.user.wallet_address.slice(0, 4)}...${p.user.wallet_address.slice(-4)}` : "Artist"),
                         creator: p.user?.wallet_address || "0xUNKNOWN",
                         sales: p.total_sold,
-                        rating: 4.5, // Mock rating for now
+                        rating: p.average_rating ?? 0,
                         isCurated: p.is_curated,
                         isNsfw: p.is_nsfw,
                         isBookmarked: true,
@@ -182,7 +182,7 @@ function ProfileContent({ params }: { params: { address: string } }) {
                         creatorName: p.user?.name || (p.user?.wallet_address ? `${p.user.wallet_address.slice(0, 4)}...${p.user.wallet_address.slice(-4)}` : "Artist"),
                         creator: p.user?.wallet_address || "0xUNKNOWN",
                         sales: p.total_sold,
-                        rating: 4.5,
+                        rating: p.average_rating ?? 0,
                         isCurated: p.is_curated,
                         isNsfw: p.is_nsfw,
                         isBookmarked: false,

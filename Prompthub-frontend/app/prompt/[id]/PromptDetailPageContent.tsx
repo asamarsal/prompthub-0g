@@ -96,7 +96,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     category: res.category,
                     sales: res.total_sold,
                     reviewsCount: 0, // Will be updated by separate fetch
-                    rating: 4.5,
+                    rating: res.average_rating ?? 0,
                     license: res.license_type,
                     royalty: res.royalty || 5, // Default royalty if null
                     tags: res.tags || [],

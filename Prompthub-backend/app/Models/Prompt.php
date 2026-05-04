@@ -50,13 +50,25 @@ class Prompt extends Model
         'reference_images' => 'array'
     ];
 
+    protected $appends = ['average_rating'];
+
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
     public function bookmarkedBy()
     {
         return $this->belongsToMany(User::class, 'bookmarks', 'prompt_id', 'user_id')->withTimestamps();
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        return round((float) $this->reviews()->avg('rating'), 1) ?: 0;
     }
 }
