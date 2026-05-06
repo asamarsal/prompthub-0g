@@ -58,7 +58,7 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
   }
 
   return (
-    <Link href={`/prompt/${prompt.id}`} className="group block h-[420px]">
+    <Link href={`/prompt/${prompt.id}`} className="group block h-[480px]">
       <div className={cn(
         "relative bg-card/60 backdrop-blur-xl border border-border transition-all duration-200 h-full flex flex-col cursor-pointer",
         isImageCategory
@@ -78,7 +78,7 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
         </button>
 
         {/* Preview area with stark watermark */}
-        <div className="relative h-[200px] bg-[#0a001a] flex items-center justify-center border-b border-[#2a2a30] overflow-hidden group-hover:border-[#00ffff]/30 transition-colors">
+        <div className="relative h-[300px] bg-[#0a001a] flex items-center justify-center border-b border-[#2a2a30] overflow-hidden group-hover:border-[#00ffff]/30 transition-colors">
           {/* Background Image — prefer watermarked version for public preview */}
           {(prompt.watermarkedPreviewUrl || prompt.image) ? (
             <img
@@ -96,40 +96,30 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
             <div className="absolute inset-0 bg-gradient-to-br from-[#1a1c23] to-[#161218]" />
           )}
 
-          {/* Brutalist Watermark matching screenshot exact angle and text */}
-          <div className="absolute inset-0 flex items-center justify-center -rotate-[12deg] pointer-events-none opacity-10 z-10 select-none">
-            <span className="text-[4rem] font-display font-black tracking-tighter uppercase leading-none text-white whitespace-nowrap">
-              PREVIEW
-            </span>
-          </div>
 
           {prompt.isCurated && (
             <div className="absolute top-4 left-4 z-10 px-2 py-1 bg-[#b4ff39] text-black text-[10px] font-black uppercase tracking-widest leading-none">
               VERIFIED
             </div>
           )}
+
+          {/* Category Badge inside image */}
+          <div className="absolute bottom-4 left-4 z-20 px-3 py-1.5 flex items-center gap-2 border border-[#00ffff]/40 bg-black/60 backdrop-blur-md">
+            <span className="text-[11px] font-display font-bold uppercase tracking-widest text-[#00ffff]">{prompt.category}</span>
+          </div>
         </div>
 
         {/* Content */}
         <div className="px-6 py-5 flex flex-col flex-grow relative z-10 bg-transparent">
-          <div className="flex items-center justify-between mb-4">
-            <div className="px-3 py-1.5 flex items-center gap-2 border border-[#00ffff]/40 bg-transparent">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-sm opacity-75 bg-[#00ffff]"></span>
-                <span className="relative inline-flex rounded-sm h-2 w-2 bg-[#00ffff]"></span>
-              </span>
-              <span className="text-[11px] font-display font-bold uppercase tracking-widest text-[#00ffff]">{prompt.category}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <h3 className="text-[1.1rem] font-display font-black tracking-widest text-white uppercase leading-[1.2] line-clamp-1">
+              {prompt.title}
+            </h3>
+            <div className="flex items-center gap-1.5 shrink-0">
               <Star className="w-4 h-4 text-[#ff2d95] fill-[#ff2d95]" />
-              <span className="text-sm font-display font-bold text-white leading-none mt-0.5 font-bold">{prompt.rating || 0}</span>
+              <span className="text-sm font-display font-bold text-white leading-none mt-0.5">{prompt.rating || 0}</span>
             </div>
           </div>
-
-          <h3 className="text-[1.1rem] font-display font-black tracking-widest text-white uppercase leading-[1.2] mb-2 w-11/12 mt-1 line-clamp-2">
-            {prompt.title}
-          </h3>
 
           <div className="flex items-center justify-between mt-auto">
             <div className="flex items-center gap-2">

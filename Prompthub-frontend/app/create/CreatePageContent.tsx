@@ -21,8 +21,7 @@ import { CHAIN_CONFIG } from "@/lib/contracts"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 
 const steps = ["Basic Info", "Pricing & License", "Upload Content", "Preview & Confirm"]
-const FALLBACK_CATEGORIES = ["Image Generation", "Text Generation", "Code Generation", "Audio Generation", "Video Generation"]
-const FALLBACK_MODELS = ["Midjourney v6", "Stable Diffusion XL", "GPT-5", "DALL-E 4", "Claude Opus"]
+// Removed hardcoded FALLBACK_CATEGORIES and FALLBACK_MODELS to ensure data comes only from the API.
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -88,8 +87,8 @@ export default function CreatePageContent() {
   const [form, setForm] = useState<FormData>({
     title: "",
     description: "",
-    category: FALLBACK_CATEGORIES[0],
-    model: FALLBACK_MODELS[0],
+    category: "",
+    model: "",
     tags: [],
     price: "0.005",
     license: "Commercial",
@@ -118,6 +117,12 @@ export default function CreatePageContent() {
         if (!mounted) return
         setTaxonomyCategories(categoriesRes)
         setTaxonomyModels(modelsRes)
+        if (categoriesRes.length > 0) {
+          setForm((prev) => ({
+            ...prev,
+            category: prev.category || categoriesRes[0].name,
+          }))
+        }
       } catch (error) {
         console.error("Failed to load category and model options", error)
       }
@@ -130,20 +135,16 @@ export default function CreatePageContent() {
   }, [])
 
   const categoryOptions = useMemo(() => {
-    return taxonomyCategories.length > 0
-      ? taxonomyCategories.map((item) => item.name)
-      : FALLBACK_CATEGORIES
+    return taxonomyCategories.map((item) => item.name)
   }, [taxonomyCategories])
 
   const modelOptions = useMemo(() => {
-    if (taxonomyModels.length === 0) return FALLBACK_MODELS
-
     const selectedCategory = taxonomyCategories.find((item) => item.name === form.category)
     const filtered = selectedCategory
       ? taxonomyModels.filter((item) => item.category_id === selectedCategory.id || item.category?.name === selectedCategory.name)
       : taxonomyModels
 
-    return (filtered.length > 0 ? filtered : taxonomyModels).map((item) => item.name)
+    return filtered.map((item) => item.name)
   }, [form.category, taxonomyCategories, taxonomyModels])
 
   useEffect(() => {
@@ -490,9 +491,16 @@ export default function CreatePageContent() {
                           onChange={(e) => update("category", e.target.value)}
                           className="w-full bg-[#160f24] border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] focus:outline-none focus:border-[#00ffff] font-medium transition-colors appearance-none"
                         >
-                          {categoryOptions.map((c) => (
-                            <option key={c} value={c} className="bg-[#0a001a]">{c}</option>
-                          ))}
+                          {categoryOptions.length === 0 ? (
+                            <option value="" disabled>Loading categories...</option>
+                          ) : (
+                            <>
+                              {!form.category && <option value="" disabled>Select Category</option>}
+                              {categoryOptions.map((c) => (
+                                <option key={c} value={c} className="bg-[#0a001a]">{c}</option>
+                              ))}
+                            </>
+                          )}
                         </select>
                       </div>
                       <div>
@@ -503,9 +511,16 @@ export default function CreatePageContent() {
                           onChange={(e) => update("model", e.target.value)}
                           className="w-full bg-[#160f24] border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] focus:outline-none focus:border-[#00ffff] font-medium transition-colors appearance-none"
                         >
-                          {modelOptions.map((m) => (
-                            <option key={m} value={m} className="bg-[#0a001a]">{m}</option>
-                          ))}
+                          {taxonomyModels.length === 0 ? (
+                            <option value="" disabled>Loading models...</option>
+                          ) : (
+                            <>
+                              {!form.model && <option value="" disabled>Select Model</option>}
+                              {modelOptions.map((m) => (
+                                <option key={m} value={m} className="bg-[#0a001a]">{m}</option>
+                              ))}
+                            </>
+                          )}
                         </select>
                       </div>
                       <div className="sm:col-span-2 lg:col-span-1">
