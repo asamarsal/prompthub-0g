@@ -9,6 +9,7 @@ import type { AxiosInstance } from "axios"
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const TOKEN_KEY = "prompthub_api_token"
+const ADMIN_TOKEN_KEY = "prompthub_admin_token"
 const COINGECKO_COIN_ID = process.env.NEXT_PUBLIC_COINGECKO_COIN_ID ?? "zero-gravity"
 const COINGECKO_URL = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(COINGECKO_COIN_ID)}&vs_currencies=usd`
 
@@ -101,6 +102,19 @@ export function setApiToken(token: string): void {
 
 export function clearApiToken(): void {
     localStorage.removeItem(TOKEN_KEY)
+}
+
+export function getAdminToken(): string | null {
+    if (typeof window === "undefined") return null
+    return localStorage.getItem(ADMIN_TOKEN_KEY)
+}
+
+export function setAdminToken(token: string): void {
+    localStorage.setItem(ADMIN_TOKEN_KEY, token)
+}
+
+export function clearAdminToken(): void {
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
 }
 
 async function request<T>(
@@ -381,6 +395,103 @@ export interface PaginatedResponse<T> {
     total: number;
 }
 
+export interface ApiCategory {
+    id: number
+    name: string
+    slug: string
+    description: string | null
+    type: "CURATED" | "COMMUNITY"
+}
+
+export interface ApiAiModel {
+    id: number
+    name: string
+    slug: string
+    description: string | null
+    category_id: number | null
+    category?: ApiCategory | null
+}
+
+export async function getCategories(): Promise<ApiCategory[]> {
+    return request<ApiCategory[]>("/api/categories")
+}
+
+export async function getAiModels(): Promise<ApiAiModel[]> {
+    return request<ApiAiModel[]>("/api/ai-models")
+}
+
+export async function createCategory(data: {
+    name: string
+    slug: string
+    description?: string
+    type: "CURATED" | "COMMUNITY"
+}): Promise<ApiCategory> {
+    const adminToken = getAdminToken()
+    return request<ApiCategory>("/api/categories", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify(data),
+    })
+}
+
+export async function updateCategory(id: number, data: Partial<{
+    name: string
+    slug: string
+    description: string
+    type: "CURATED" | "COMMUNITY"
+}>): Promise<ApiCategory> {
+    const adminToken = getAdminToken()
+    return request<ApiCategory>(`/api/categories/${id}`, {
+        method: "PUT",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify(data),
+    })
+}
+
+export async function deleteCategory(id: number): Promise<{ message: string }> {
+    const adminToken = getAdminToken()
+    return request<{ message: string }>(`/api/categories/${id}`, {
+        method: "DELETE",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+    })
+}
+
+export async function createAiModel(data: {
+    name: string
+    slug: string
+    description?: string
+    category_id: number
+}): Promise<ApiAiModel> {
+    const adminToken = getAdminToken()
+    return request<ApiAiModel>("/api/ai-models", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify(data),
+    })
+}
+
+export async function updateAiModel(id: number, data: Partial<{
+    name: string
+    slug: string
+    description: string
+    category_id: number
+}>): Promise<ApiAiModel> {
+    const adminToken = getAdminToken()
+    return request<ApiAiModel>(`/api/ai-models/${id}`, {
+        method: "PUT",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify(data),
+    })
+}
+
+export async function deleteAiModel(id: number): Promise<{ message: string }> {
+    const adminToken = getAdminToken()
+    return request<{ message: string }>(`/api/ai-models/${id}`, {
+        method: "DELETE",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+    })
+}
+
 /**
  * GET /api/prompts
  * Fetches a paginated list of prompts with optional filters.
@@ -471,6 +582,58 @@ export async function createPrompt(data: any): Promise<any> {
         method: "POST",
         body: JSON.stringify(data),
     });
+}
+
+/**
+ * PUT /api/prompts/{id}/curate
+ * Updates a prompt's curation status.
+ */
+export async function curatePrompt(id: string | number, isCurated: boolean): Promise<any> {
+    const adminToken = getAdminToken()
+
+    return request<any>(`/api/prompts/${id}/curate`, {
+        method: "PUT",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify({ is_curated: isCurated }),
+    });
+}
+
+export async function adminLogin(data: { username: string; password: string }): Promise<{
+    admin_token: string
+    expires_at: string
+    wallet: string
+}> {
+    const res = await request<{ admin_token: string; expires_at: string; wallet: string }>("/api/admin/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+    })
+    setAdminToken(res.admin_token)
+    return res
+}
+
+export async function requestAdminPasswordOtp(): Promise<{
+    message: string
+    email: string
+    expires_in_minutes: number
+}> {
+    const adminToken = getAdminToken()
+    return request<{ message: string; email: string; expires_in_minutes: number }>("/api/admin/password/otp", {
+        method: "POST",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+    })
+}
+
+export async function changeAdminPassword(data: {
+    otp: string
+    new_password: string
+    new_password_confirmation: string
+}): Promise<{ message: string }> {
+    const adminToken = getAdminToken()
+    return request<{ message: string }>("/api/admin/password", {
+        method: "PUT",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify(data),
+    })
 }
 
 // ─── AI Recommendations ───────────────────────────────────────────────────

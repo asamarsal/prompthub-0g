@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AiModel;
+use App\Http\Controllers\AdminAuthController;
 use Illuminate\Http\Request;
 
 class AiModelController extends Controller
@@ -14,6 +15,8 @@ class AiModelController extends Controller
 
     public function store(Request $request)
     {
+        AdminAuthController::validateAdminRequest($request);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:ai_models',
@@ -28,6 +31,8 @@ class AiModelController extends Controller
 
     public function update(Request $request, $id)
     {
+        AdminAuthController::validateAdminRequest($request);
+
         $aiModel = AiModel::findOrFail($id);
 
         $validated = $request->validate([
@@ -40,5 +45,15 @@ class AiModelController extends Controller
         $aiModel->update($validated);
 
         return response()->json($aiModel);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        AdminAuthController::validateAdminRequest($request);
+
+        $aiModel = AiModel::findOrFail($id);
+        $aiModel->delete();
+
+        return response()->json(['message' => 'AI model deleted']);
     }
 }

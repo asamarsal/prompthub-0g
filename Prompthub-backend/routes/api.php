@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\PromptController;
 use App\Http\Controllers\ContestController;
 use App\Http\Controllers\HireRequestController;
@@ -41,6 +42,11 @@ Route::get('/prompts/{id}/similar', [PromptRecommendationController::class, 'sim
 
 // Protected routes (requires Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
+    // Admin
+    Route::post('/admin/login', [AdminAuthController::class, 'login']);
+    Route::post('/admin/password/otp', [AdminAuthController::class, 'requestPasswordOtp']);
+    Route::put('/admin/password', [AdminAuthController::class, 'changePassword']);
+
     // Users
     Route::get('/users/search', [UserController::class, 'search']);
     Route::get('/users/me', [AuthController::class, 'me']);
@@ -57,8 +63,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Taxonomy
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::put('/categories/{id}', [CategoryController::class, 'update']);
+    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
     Route::post('/ai-models', [AiModelController::class, 'store']);
     Route::put('/ai-models/{id}', [AiModelController::class, 'update']);
+    Route::delete('/ai-models/{id}', [AiModelController::class, 'destroy']);
     
     // Prompts
     Route::post('/prompts', [PromptController::class, 'store']);

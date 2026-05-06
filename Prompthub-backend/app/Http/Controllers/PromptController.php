@@ -88,7 +88,9 @@ class PromptController extends Controller
                 break;
         }
 
-        return response()->json($query->paginate(15));
+        $perPage = min(max((int) $request->get('per_page', 15), 1), 100);
+
+        return response()->json($query->paginate($perPage));
     }
 
     public function show($id)
@@ -209,7 +211,8 @@ class PromptController extends Controller
 
     public function curate($id, Request $request)
     {
-        // Require Admin validation here in future
+        AdminAuthController::validateAdminRequest($request);
+
         $validated = $request->validate([
             'is_curated' => 'required|boolean'
         ]);

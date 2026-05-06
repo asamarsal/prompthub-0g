@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useWallet, truncateAddress } from "@/lib/wallet-context"
 import { Check, Loader2, ExternalLink, Wallet } from "lucide-react"
+import { toast } from "sonner"
 
 const wallets = [
   { id: "metamask", name: "MetaMask", recommended: true },
@@ -12,7 +13,11 @@ export function ConnectWalletModal({ open, onClose }: { open: boolean; onClose: 
   const { isConnected, isConnecting, address, balance, connect, disconnect } = useWallet()
 
   const handleConnect = async (walletId: string) => {
-    await connect(walletId)
+    try {
+      await connect(walletId)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to connect wallet")
+    }
   }
 
   return (

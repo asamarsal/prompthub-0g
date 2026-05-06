@@ -29,6 +29,14 @@ export function WalletSelectorModal({
         setConnecting(true)
         try {
             const ethereum = (window as any).ethereum
+            try {
+                await ethereum.request({
+                    method: "wallet_requestPermissions",
+                    params: [{ eth_accounts: {} }],
+                })
+            } catch (err: any) {
+                if (err?.code === 4001) throw err
+            }
             const accounts: string[] = await ethereum.request({ method: "eth_requestAccounts" })
             const address = accounts?.[0]
 

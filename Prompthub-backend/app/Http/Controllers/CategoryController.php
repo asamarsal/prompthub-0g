@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\AdminAuthController;
 
 class CategoryController extends Controller
 {
@@ -13,6 +14,8 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
+        AdminAuthController::validateAdminRequest($request);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:categories',
@@ -27,6 +30,8 @@ class CategoryController extends Controller
 
     public function update(Request $request, $id)
     {
+        AdminAuthController::validateAdminRequest($request);
+
         $category = \App\Models\Category::findOrFail($id);
 
         $request->validate([
@@ -39,5 +44,19 @@ class CategoryController extends Controller
         $category->update($request->only('name', 'slug', 'description', 'type'));
 
         return response()->json($category);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        AdminAuthController::validateAdminRequest($request);
+
+        $category = \App\Models\Category::withCount('aiModels')->findOrFail($id);
+        if ($category->ai_models_count > 0) {
+            return response()->json(['message' => 'Cannot delete a category that still has AI models.'], 422);
+        }
+
+        $category->delete();
+
+        return response()->json(['message' => 'Category deleted']);
     }
 }

@@ -17,7 +17,13 @@ class AuthController extends Controller
         ]);
 
         $address = strtolower(trim($request->wallet_address));
-        $user = User::firstOrCreate(['wallet_address' => $address]);
+        $user = $this->findUserByWallet($address);
+        if (!$user) {
+            $user = User::create(['wallet_address' => $address]);
+        } elseif ($user->wallet_address !== $address && !$this->walletExistsOnAnotherUser($address, $user->id)) {
+            $user->wallet_address = $address;
+            $user->save();
+        }
         
         $token = $user->createToken('auth')->plainTextToken;
 
@@ -34,8 +40,26 @@ class AuthController extends Controller
 
     public function show($address)
     {
-        $user = User::where('wallet_address', strtolower(trim($address)))->firstOrFail();
+        $user = $this->findUserByWallet(strtolower(trim($address)));
+        abort_if(!$user, 404);
+
         return response()->json($this->enrichProfile($user));
+    }
+
+    private function findUserByWallet(string $address): ?User
+    {
+        return User::whereRaw('LOWER(wallet_address) = ?', [$address])
+            ->orderByRaw('CASE WHEN roles IS NULL THEN 0 ELSE 1 END DESC')
+            ->orderByRaw('CASE WHEN name IS NULL THEN 0 ELSE 1 END DESC')
+            ->orderByDesc('updated_at')
+            ->first();
+    }
+
+    private function walletExistsOnAnotherUser(string $address, string $userId): bool
+    {
+        return User::where('wallet_address', $address)
+            ->where('id', '!=', $userId)
+            ->exists();
     }
 
     private function enrichProfile(User $user)

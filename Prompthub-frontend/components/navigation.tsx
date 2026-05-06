@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { Menu, X, Search, LayoutDashboard, Plus, Wallet, Copy, Check, Palette, Trophy, User, Settings, ChevronDown, Bell, MessageSquare, Heart, ShoppingBag } from "lucide-react"
+import { Menu, X, Search, LayoutDashboard, Plus, Wallet, Copy, Check, Palette, Trophy, User, Settings, ChevronDown, Bell, MessageSquare, Heart, ShoppingBag, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWallet, truncateAddress, ROLE_LABELS, ROLE_ICONS, type UserRole } from "@/lib/wallet-context"
 import { RoleOnboardingModal } from "@/components/role-onboarding-modal"
@@ -18,13 +18,17 @@ const navLinks = [
   { href: "/hire", label: "HIRE", icon: Palette },
   { href: "/contests", label: "CONTESTS", icon: Trophy },
   { href: "/messages", label: "MESSAGES", icon: MessageSquare },
+  { href: "/admin", label: "ADMIN", icon: ShieldCheck },
   { href: "/dashboard", label: "DASHBOARD", icon: LayoutDashboard },
   { href: "/create", label: "CREATE", icon: Plus },
 ]
 
+const ADMIN_WALLET =
+  (process.env.NEXT_PUBLIC_PROMPTHUB_ADMIN_WALLET || "0xfeff727205fe524a3a8a16c404fec9cfe4124acd").toLowerCase()
+
 export function Navigation() {
   const pathname = usePathname()
-  const { isConnected, address, balance, disconnect, connect, profile, needsOnboarding, switchRole, saveProfile } = useWallet()
+  const { isConnected, address, balance, disconnect, connect, isConnecting, profile, needsOnboarding, switchRole, saveProfile } = useWallet()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -34,6 +38,12 @@ export function Navigation() {
 
   const { theme, resolvedTheme } = useTheme()
   const { unreadCount } = useNotifications()
+  const isAdminWallet = Boolean(address && address.toLowerCase() === ADMIN_WALLET)
+  const visibleNavLinks = navLinks.filter((link) => {
+    if (link.href === "/admin") return isAdminWallet
+    if (!isConnected && (link.href === "/dashboard" || link.href === "/messages")) return false
+    return true
+  })
 
   useEffect(() => setMounted(true), [])
 
@@ -48,6 +58,14 @@ export function Navigation() {
   const handleSwitchRole = (role: UserRole) => {
     switchRole(role)
     setShowDropdown(false)
+  }
+
+  const handleConnectWallet = async () => {
+    try {
+      await connect()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to connect wallet")
+    }
   }
 
   // Show onboarding if needed
@@ -67,7 +85,7 @@ export function Navigation() {
           </Link>
 
           <div className="hidden md:flex items-center gap-8 h-full">
-            {navLinks.filter(l => isConnected || (l.href !== "/dashboard" && l.href !== "/messages")).map((link) => {
+            {visibleNavLinks.map((link) => {
               const Icon = link.icon
               const isActive = pathname === link.href
               return (
@@ -285,12 +303,13 @@ export function Navigation() {
               </div>
             ) : (
               <button
-                onClick={() => connect()}
+                onClick={handleConnectWallet}
+                disabled={isConnecting}
                 className="flex items-center gap-2 px-4 py-2 border transition-all text-sm font-bold group bg-white text-slate-900 border-sky-300 hover:border-sky-500 hover:bg-sky-50 dark:bg-[#121214] dark:border-[#222] dark:hover:border-[#a855f7] dark:text-white"
                 aria-label="Connect 0G Wallet"
               >
                 <Wallet className="w-4 h-4 text-sky-600 group-hover:text-sky-700 dark:text-white/50 dark:group-hover:text-[#a855f7] transition-colors" />
-                Connect Wallet
+                {isConnecting ? "Connecting..." : "Connect Wallet"}
               </button>
             )}
           </div>
@@ -309,7 +328,7 @@ export function Navigation() {
                 <span className="text-xs font-display font-bold text-muted-foreground uppercase tracking-widest">Theme</span>
                 <ThemeToggle />
               </div>
-              {navLinks.filter(l => isConnected || (l.href !== "/dashboard" && l.href !== "/messages")).map((link) => {
+              {visibleNavLinks.map((link) => {
                 const Icon = link.icon
                 const isActive = pathname === link.href
                 return (
@@ -352,8 +371,8 @@ export function Navigation() {
                   <button onClick={() => { disconnect(); setMobileOpen(false) }} className="text-xs font-bold text-[#ff2d95] text-left py-1 uppercase tracking-widest transition-colors">Disconnect</button>
                 </div>
               ) : (
-                <button onClick={() => { setMobileOpen(false); connect() }} className="flex items-center gap-3 px-4 py-3 text-sm font-display font-bold tracking-widest text-slate-700 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white uppercase transition-colors w-full text-left">
-                  <Wallet className="w-4 h-4" /> Connect Wallet
+                <button onClick={() => { setMobileOpen(false); handleConnectWallet() }} disabled={isConnecting} className="flex items-center gap-3 px-4 py-3 text-sm font-display font-bold tracking-widest text-slate-700 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white uppercase transition-colors w-full text-left disabled:opacity-60">
+                  <Wallet className="w-4 h-4" /> {isConnecting ? "Connecting..." : "Connect Wallet"}
                 </button>
               )}
             </div>

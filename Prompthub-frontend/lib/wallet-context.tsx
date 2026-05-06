@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import { loginWithWallet, updateProfile as apiUpdateProfile, clearApiToken, fetchMe, type ProfileStats, type UserActivity } from "@/lib/api";
+import { loginWithWallet, updateProfile as apiUpdateProfile, clearApiToken, clearAdminToken, fetchMe, type ProfileStats, type UserActivity } from "@/lib/api";
 import { getBrowserProvider, ensure0GNetwork, getWalletBalance } from "@/lib/evm";
 import { CHAIN_CONFIG } from "@/lib/contracts";
 
@@ -79,6 +79,37 @@ const WalletContext = createContext<WalletContextType | undefined>(undefined);
 const STORAGE_KEY = "prompthub_wallet_address";
 const PROFILE_KEY = "prompthub_profile";
 
+async function requestWalletAccounts(): Promise<string[]> {
+  const ethereum = window.ethereum;
+  if (!ethereum?.request) {
+    throw new Error("Wallet provider not found. Please install MetaMask.");
+  }
+
+  try {
+    await ethereum.request({
+      method: "wallet_requestPermissions",
+      params: [{ eth_accounts: {} }],
+    });
+  } catch (error: any) {
+    if (error?.code === 4001) throw error;
+    // Some wallets do not support permission prompts; fall back below.
+  }
+
+  return ethereum.request({ method: "eth_requestAccounts" });
+}
+
+function revokeWalletPermissions() {
+  const ethereum = window.ethereum;
+  if (!ethereum?.request) return;
+
+  ethereum.request({
+    method: "wallet_revokePermissions",
+    params: [{ eth_accounts: {} }],
+  }).catch(() => {
+    // Not every wallet supports EIP-2255 revoke; local session is still cleared.
+  });
+}
+
 function normalizeNetwork(chainId?: number): "testnet" | "mainnet" {
   if (!chainId) return "testnet";
   return chainId === CHAIN_CONFIG.chainId ? "testnet" : "mainnet";
@@ -107,7 +138,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return DEFAULT_PROFILE;
   }, []);
 
-  const syncProfileFromBackend = useCallback(async (localProfile: UserProfile) => {
+  const syncProfileFromBackend = useCallback(async (localProfile: UserProfile): Promise<boolean> => {
     try {
       const user = await fetchMe();
       const merged: UserProfile = {
@@ -130,8 +161,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem(PROFILE_KEY, JSON.stringify(merged));
       setWallet((w) => ({ ...w, profile: merged, needsOnboarding: merged.roles.length === 0 }));
+      return true;
     } catch {
-      // non-blocking
+      setWallet((w) => ({ ...w, needsOnboarding: false }));
+      return false;
     }
   }, []);
 
@@ -149,7 +182,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       balance,
       network: normalizeNetwork(Number(network.chainId)),
       profile,
-      needsOnboarding: profile.roles.length === 0,
+      needsOnboarding: false,
     }));
   }, [loadProfile]);
 
@@ -157,11 +190,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setIsConnecting(true);
     try {
       const provider = await getBrowserProvider();
-      await ensure0GNetwork(provider);
-      const accounts: string[] = await provider.send("eth_requestAccounts", []);
+      const accounts = await requestWalletAccounts();
       const address = accounts?.[0]?.toLowerCase();
       if (!address) throw new Error("Wallet address not found");
 
+      await ensure0GNetwork(provider);
       localStorage.setItem(STORAGE_KEY, address);
       await applyConnectedState(address);
 
@@ -178,7 +211,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const disconnect = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PROFILE_KEY);
     clearApiToken();
+    clearAdminToken();
+    revokeWalletPermissions();
     setWallet({
       isConnected: false,
       address: null,
@@ -196,8 +232,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const provider = await getBrowserProvider();
         const accounts: string[] = await provider.send("eth_accounts", []);
         const saved = localStorage.getItem(STORAGE_KEY);
-      const address = accounts?.[0] || saved;
-      if (mounted && address) {
+        const currentAccount = accounts?.[0]?.toLowerCase();
+
+        if (saved && (!currentAccount || saved.toLowerCase() !== currentAccount)) {
+          disconnect();
+          return;
+        }
+
+        const address = saved && saved.toLowerCase() === currentAccount ? saved : null;
+        if (mounted && address) {
           const normalizedAddress = address.toLowerCase();
           localStorage.setItem(STORAGE_KEY, normalizedAddress);
           await applyConnectedState(normalizedAddress);
@@ -219,7 +262,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return;
       }
       const nextAddress = accounts[0].toLowerCase();
-      localStorage.setItem(STORAGE_KEY, nextAddress);
+      const currentAddress = localStorage.getItem(STORAGE_KEY)?.toLowerCase();
+
+      if (!currentAddress || currentAddress !== nextAddress) {
+        disconnect();
+        return;
+      }
+
       await applyConnectedState(nextAddress);
     };
 

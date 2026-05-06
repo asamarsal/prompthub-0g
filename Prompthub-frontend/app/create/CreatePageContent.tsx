@@ -1,10 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AppShell } from "@/components/app-shell"
 import { Upload, Check, ChevronRight, ChevronLeft, FileText, Lightbulb, X, Loader2, ExternalLink, AlertTriangle, ImagePlus, ShieldCheck } from "lucide-react"
-import { categories as allCategories, models as allModels } from "@/lib/mock-data"
-import { createPrompt, uploadMetadata, uploadPromptAsset, checkPlagiarism } from "@/lib/api"
+import {
+  createPrompt,
+  getAiModels,
+  getCategories,
+  uploadMetadata,
+  uploadPromptAsset,
+  checkPlagiarism,
+  type ApiAiModel,
+  type ApiCategory,
+} from "@/lib/api"
 import { uploadTo0GStorageNetwork, getStorageTxExplorerUrl } from "@/lib/zero-g-storage"
 import { useWallet } from "@/lib/wallet-context"
 import { parseEther } from "ethers"
@@ -13,6 +21,8 @@ import { CHAIN_CONFIG } from "@/lib/contracts"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 
 const steps = ["Basic Info", "Pricing & License", "Upload Content", "Preview & Confirm"]
+const FALLBACK_CATEGORIES = ["Image Generation", "Text Generation", "Code Generation", "Audio Generation", "Video Generation"]
+const FALLBACK_MODELS = ["Midjourney v6", "Stable Diffusion XL", "GPT-5", "DALL-E 4", "Claude Opus"]
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -72,12 +82,14 @@ export default function CreatePageContent() {
   const [deployedStorageHash, setDeployedStorageHash] = useState<string | null>(null)
   const [deployedStorageTxHash, setDeployedStorageTxHash] = useState<string | null>(null)
   const [isVerified, setIsVerified] = useState(true) // Mock state to demonstrate different roles
+  const [taxonomyCategories, setTaxonomyCategories] = useState<ApiCategory[]>([])
+  const [taxonomyModels, setTaxonomyModels] = useState<ApiAiModel[]>([])
   const { price: ogPrice } = use0GPrice()
   const [form, setForm] = useState<FormData>({
     title: "",
     description: "",
-    category: allCategories[1],
-    model: allModels[1],
+    category: FALLBACK_CATEGORIES[0],
+    model: FALLBACK_MODELS[0],
     tags: [],
     price: "0.005",
     license: "Commercial",
@@ -96,6 +108,55 @@ export default function CreatePageContent() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [plagiarismResult, setPlagiarismResult] = useState<any>(null)
   const [plagiarismChecking, setPlagiarismChecking] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadTaxonomy() {
+      try {
+        const [categoriesRes, modelsRes] = await Promise.all([getCategories(), getAiModels()])
+        if (!mounted) return
+        setTaxonomyCategories(categoriesRes)
+        setTaxonomyModels(modelsRes)
+      } catch (error) {
+        console.error("Failed to load category and model options", error)
+      }
+    }
+
+    loadTaxonomy()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const categoryOptions = useMemo(() => {
+    return taxonomyCategories.length > 0
+      ? taxonomyCategories.map((item) => item.name)
+      : FALLBACK_CATEGORIES
+  }, [taxonomyCategories])
+
+  const modelOptions = useMemo(() => {
+    if (taxonomyModels.length === 0) return FALLBACK_MODELS
+
+    const selectedCategory = taxonomyCategories.find((item) => item.name === form.category)
+    const filtered = selectedCategory
+      ? taxonomyModels.filter((item) => item.category_id === selectedCategory.id || item.category?.name === selectedCategory.name)
+      : taxonomyModels
+
+    return (filtered.length > 0 ? filtered : taxonomyModels).map((item) => item.name)
+  }, [form.category, taxonomyCategories, taxonomyModels])
+
+  useEffect(() => {
+    if (categoryOptions.length > 0 && !categoryOptions.includes(form.category)) {
+      setForm((prev) => ({ ...prev, category: categoryOptions[0] }))
+    }
+  }, [categoryOptions, form.category])
+
+  useEffect(() => {
+    if (modelOptions.length > 0 && !modelOptions.includes(form.model)) {
+      setForm((prev) => ({ ...prev, model: modelOptions[0] }))
+    }
+  }, [modelOptions, form.model])
 
   useEffect(() => {
     if (form.previewImageFile) {
@@ -429,7 +490,7 @@ export default function CreatePageContent() {
                           onChange={(e) => update("category", e.target.value)}
                           className="w-full bg-[#160f24] border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] focus:outline-none focus:border-[#00ffff] font-medium transition-colors appearance-none"
                         >
-                          {allCategories.slice(1).map((c) => (
+                          {categoryOptions.map((c) => (
                             <option key={c} value={c} className="bg-[#0a001a]">{c}</option>
                           ))}
                         </select>
@@ -442,7 +503,7 @@ export default function CreatePageContent() {
                           onChange={(e) => update("model", e.target.value)}
                           className="w-full bg-[#160f24] border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] focus:outline-none focus:border-[#00ffff] font-medium transition-colors appearance-none"
                         >
-                          {allModels.slice(1).map((m) => (
+                          {modelOptions.map((m) => (
                             <option key={m} value={m} className="bg-[#0a001a]">{m}</option>
                           ))}
                         </select>

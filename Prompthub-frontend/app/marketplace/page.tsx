@@ -3,11 +3,12 @@
 import { useState, useMemo, useEffect } from "react"
 import { AppShell } from "@/components/app-shell"
 import { PromptCard } from "@/components/prompt-card"
-import { categories, models, licenses } from "@/lib/mock-data"
+import { licenses } from "@/lib/mock-data"
 import { Search, SlidersHorizontal, ChevronDown, Loader2 } from "lucide-react"
-import { getPrompts } from "@/lib/api"
+import { getAiModels, getCategories, getPrompts, type ApiAiModel, type ApiCategory } from "@/lib/api"
 
 type SortOption = "newest" | "best-selling" | "price-low" | "price-high" | "rating"
+type NsfwFilter = "Safe Only" | "NSFW Only" | "Show NSFW"
 
 function FilterSelect({
   label,
@@ -45,12 +46,14 @@ export default function MarketplacePage() {
   const [category, setCategory] = useState("All Categories")
   const [model, setModel] = useState("All Models")
   const [license, setLicense] = useState("All Licenses")
-  const [showNsfw, setShowNsfw] = useState(false)
+  const [nsfwFilter, setNsfwFilter] = useState<NsfwFilter>("Safe Only")
   const [sort, setSort] = useState<SortOption>("newest")
   const [page, setPage] = useState(1)
   const perPage = 6
 
   const [apiPrompts, setApiPrompts] = useState<any[]>([])
+  const [apiCategories, setApiCategories] = useState<ApiCategory[]>([])
+  const [apiModels, setApiModels] = useState<ApiAiModel[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -58,7 +61,11 @@ export default function MarketplacePage() {
       try {
         setLoading(true)
         // Fetch all prompts to utilize existing client-side filters
-        const res = await getPrompts({ per_page: '100', nsfw: 'true' })
+        const [res, categoriesRes, modelsRes] = await Promise.all([
+          getPrompts({ per_page: '100', nsfw: 'true' }),
+          getCategories(),
+          getAiModels(),
+        ])
 
         // Map backend snake_case to frontend camelCase
         const mapped = res.data.map((p: any) => ({
@@ -76,12 +83,14 @@ export default function MarketplacePage() {
           currency: p.currency || "0G",
           rating: p.average_rating ?? 0,
           isCurated: p.is_curated,
-          isNsfw: p.is_nsfw,
+          isNsfw: Boolean(p.is_nsfw),
           isBookmarked: !!p.is_bookmarked,
           license: p.license_type,
           createdAt: p.created_at
         }))
         setApiPrompts(mapped)
+        setApiCategories(categoriesRes)
+        setApiModels(modelsRes)
       } catch (err) {
         console.error("Failed to load prompts", err)
       } finally {
@@ -90,6 +99,28 @@ export default function MarketplacePage() {
     }
     fetchAll()
   }, [])
+
+  const categoryOptions = useMemo(
+    () => ["All Categories", ...apiCategories.map((item) => item.name)],
+    [apiCategories],
+  )
+
+  const modelOptions = useMemo(() => {
+    const selectedCategory = apiCategories.find((item) => item.name === category)
+    const filteredModels =
+      category === "All Categories"
+        ? apiModels
+        : apiModels.filter((item) => item.category_id === selectedCategory?.id || item.category?.name === category)
+
+    return ["All Models", ...filteredModels.map((item) => item.name)]
+  }, [apiCategories, apiModels, category])
+
+  useEffect(() => {
+    if (!modelOptions.includes(model)) {
+      setModel("All Models")
+      setPage(1)
+    }
+  }, [model, modelOptions])
 
   const filtered = useMemo(() => {
     let result = [...apiPrompts]
@@ -111,7 +142,8 @@ export default function MarketplacePage() {
     if (category !== "All Categories") result = result.filter((p) => p.category === category)
     if (model !== "All Models") result = result.filter((p) => p.model === model)
     if (license !== "All Licenses") result = result.filter((p) => p.license === license)
-    if (!showNsfw) result = result.filter((p) => !p.isNsfw)
+    if (nsfwFilter === "Safe Only") result = result.filter((p) => !p.isNsfw)
+    if (nsfwFilter === "NSFW Only") result = result.filter((p) => p.isNsfw)
 
     switch (sort) {
       case "best-selling":
@@ -131,7 +163,7 @@ export default function MarketplacePage() {
     }
 
     return result
-  }, [search, tab, category, model, license, sort, showNsfw, apiPrompts])
+  }, [search, tab, category, model, license, sort, nsfwFilter, apiPrompts])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
@@ -201,17 +233,19 @@ export default function MarketplacePage() {
             </div>
             
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-              <FilterSelect label="Category" value={category} options={categories} onChange={(v) => { setCategory(v); setPage(1) }} />
-              <FilterSelect label="AI Model" value={model} options={models} onChange={(v) => { setModel(v); setPage(1) }} />
+              <FilterSelect label="Category" value={category} options={categoryOptions} onChange={(v) => { setCategory(v); setPage(1) }} />
+              <FilterSelect label="AI Model" value={model} options={modelOptions} onChange={(v) => { setModel(v); setPage(1) }} />
               <FilterSelect label="License" value={license} options={licenses} onChange={(v) => { setLicense(v); setPage(1) }} />
               
-              <label className="flex items-center gap-2 cursor-pointer bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] hover:border-[#ff2d95] px-3 sm:px-4 py-2.5 text-[11px] sm:text-sm text-[#a78bfa] hover:text-[#e0d4ff] transition-all font-semibold select-none shadow-[0_0_0_0_transparent] hover:shadow-[4px_4px_0_0_#ff2d95] hover:-translate-y-0.5 hover:-translate-x-0.5 min-w-0 overflow-hidden whitespace-nowrap">
-                <input type="checkbox" className="sr-only" checked={showNsfw} onChange={(e) => { setShowNsfw(e.target.checked); setPage(1); }} />
-                <div className={`w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 flex items-center justify-center transition-colors shrink-0 ${showNsfw ? 'bg-[#ff2d95] border-[#ff2d95]' : 'border-[#a78bfa]'}`}>
-                  {showNsfw && <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white" />}
-                </div>
-                <span className="truncate">NSFW (18+)</span>
-              </label>
+              <FilterSelect
+                label="NSFW"
+                value={nsfwFilter}
+                options={["Safe Only", "NSFW Only", "Show NSFW"]}
+                onChange={(v) => {
+                  setNsfwFilter(v as NsfwFilter)
+                  setPage(1)
+                }}
+              />
             </div>
 
             <div className="w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0">
