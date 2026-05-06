@@ -174,37 +174,37 @@ export default function MarketplacePage() {
         {/* Header */}
         <div className="mb-8">
           <p className="text-sm font-bold text-[#ff2d95] uppercase tracking-widest mb-2 font-mono">{"// BROWSE"}</p>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-              <div>
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-[#e0d4ff] leading-tight">
-                  Explore <span className="gradient-text-holographic">Marketplace</span>
-                </h1>
-                <p className="mt-2 text-sm sm:text-base text-[#a78bfa]">
-                  Discover {apiPrompts.length.toLocaleString()} prompts from top creators
-                </p>
-              </div>
-
-              <div className="flex w-full sm:w-auto bg-card/80 backdrop-blur-md border-2 border-border p-1 shadow-[4px_4px_0_0_var(--shadow-neo)]">
-                <button
-                  onClick={() => { setTab("curated"); setPage(1); }}
-                  className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-extrabold uppercase transition-all ${tab === "curated"
-                    ? "bg-[#00ffff] text-black shadow-[2px_2px_0_0_#d1d5db]"
-                    : "text-[#a78bfa] hover:text-[#e0d4ff]"
-                    }`}
-                >
-                  Curated
-                </button>
-                <button
-                  onClick={() => { setTab("community"); setPage(1); }}
-                  className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-extrabold uppercase transition-all ${tab === "community"
-                    ? "bg-[#b4ff39] text-black shadow-[2px_2px_0_0_#d1d5db]"
-                    : "text-[#a78bfa] hover:text-[#e0d4ff]"
-                    }`}
-                >
-                  Community
-                </button>
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+            <div>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-[#e0d4ff] leading-tight">
+                Explore <span className="gradient-text-holographic">Marketplace</span>
+              </h1>
+              <p className="mt-2 text-sm sm:text-base text-[#a78bfa]">
+                Discover {apiPrompts.length.toLocaleString()} prompts from top creators
+              </p>
             </div>
+
+            <div className="flex w-full sm:w-auto bg-card/80 backdrop-blur-md border-2 border-border p-1 shadow-[4px_4px_0_0_var(--shadow-neo)]">
+              <button
+                onClick={() => { setTab("curated"); setPage(1); }}
+                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-extrabold uppercase transition-all ${tab === "curated"
+                  ? "bg-[#00ffff] text-black shadow-[2px_2px_0_0_#d1d5db]"
+                  : "text-[#a78bfa] hover:text-[#e0d4ff]"
+                  }`}
+              >
+                Curated
+              </button>
+              <button
+                onClick={() => { setTab("community"); setPage(1); }}
+                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-extrabold uppercase transition-all ${tab === "community"
+                  ? "bg-[#b4ff39] text-black shadow-[2px_2px_0_0_#d1d5db]"
+                  : "text-[#a78bfa] hover:text-[#e0d4ff]"
+                  }`}
+              >
+                Community
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -231,12 +231,12 @@ export default function MarketplacePage() {
               <SlidersHorizontal className="w-4 h-4 text-[#ff2d95] shrink-0" />
               <span className="text-xs font-bold text-[#ff2d95] uppercase tracking-wider sm:hidden">Filters</span>
             </div>
-            
+
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
               <FilterSelect label="Category" value={category} options={categoryOptions} onChange={(v) => { setCategory(v); setPage(1) }} />
               <FilterSelect label="AI Model" value={model} options={modelOptions} onChange={(v) => { setModel(v); setPage(1) }} />
               <FilterSelect label="License" value={license} options={licenses} onChange={(v) => { setLicense(v); setPage(1) }} />
-              
+
               <FilterSelect
                 label="NSFW"
                 value={nsfwFilter}
