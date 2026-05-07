@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Star, Heart } from "lucide-react"
+import { Star, Heart, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { toggleBookmark } from "@/lib/api"
 import type { Prompt } from "@/lib/mock-data"
@@ -69,12 +69,16 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
         <button
           onClick={handleBookmark}
           disabled={loading}
-          className="absolute top-4 right-4 z-[20] w-9 h-9 rounded-none border border-border bg-card/60 backdrop-blur-md flex items-center justify-center transition-all hover:border-[#ff2d95] group/heart active:scale-95"
+          className="absolute top-4 right-4 z-[20] w-9 h-9 rounded-none border border-border bg-card/60 backdrop-blur-md flex items-center justify-center transition-all hover:border-[#ff2d95] group/heart active:scale-95 disabled:opacity-50"
         >
-          <Heart className={cn(
-            "w-4.5 h-4.5 transition-colors",
-            isBookmarked ? "fill-[#ff2d95] text-[#ff2d95]" : "text-white/40 group-hover/heart:text-[#ff2d95]"
-          )} />
+          {loading ? (
+            <Loader2 className="w-4 h-4 text-[#ff2d95] animate-spin" />
+          ) : (
+            <Heart className={cn(
+              "w-4.5 h-4.5 transition-colors",
+              isBookmarked ? "fill-[#ff2d95] text-[#ff2d95]" : "text-white/40 group-hover/heart:text-[#ff2d95]"
+            )} />
+          )}
         </button>
 
         {/* Preview area with stark watermark */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Check, Loader2, ExternalLink, Download, LayoutDashboard, Share2, XCircle } from "lucide-react"
 import type { Prompt } from "@/lib/mock-data"
@@ -36,14 +36,28 @@ export function PurchaseModal({
   const [submittingReview, setSubmittingReview] = useState(false)
   const [reviewSubmitted, setReviewSubmitted] = useState(false)
 
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setState("confirm")
+      setTxId(null)
+      setErrorMsg(null)
+      setRating(0)
+      setComment("")
+      setSubmittingReview(false)
+      setReviewSubmitted(false)
+    }
+  }, [open])
+
   // In the Smart Contract, fees are deducted FROM the price.
   // So the total to pay is exactly prompt.price.
-  const total = prompt.price
+  const total = prompt.price || 0
   const platformFee = total * 0.025
-  const royaltyFee = total * (prompt.royalty / 100)
+  const royaltyFee = total * ((prompt.royalty || 0) / 100)
   const sellerReceives = total - platformFee - royaltyFee
 
-  const isSelfPurchase = !!address && !!prompt.creator && address.toLowerCase() === prompt.creator.toLowerCase()
+  const creatorAddress = prompt.creator || (prompt as any).user?.wallet_address || ""
+  const isSelfPurchase = !!address && !!creatorAddress && address.toLowerCase() === creatorAddress.toLowerCase()
 
   const handleConfirm = async () => {
     if (!isConnected || !address) {
@@ -64,7 +78,7 @@ export function PurchaseModal({
     setState("processing")
 
     try {
-      if (!prompt.contract_id) throw new Error("Missing on-chain token id");
+      if (prompt.contract_id === undefined || prompt.contract_id === null) throw new Error("Missing on-chain token id");
       const marketplace = await getMarketplaceContract();
       const value = parseEther(String(total));
       const tx = await marketplace.buyPrompt(prompt.contract_id, { value });

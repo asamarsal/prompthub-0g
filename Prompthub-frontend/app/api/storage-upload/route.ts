@@ -27,7 +27,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Convert File to Uint8Array
+    const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB limit
     const arrayBuffer = await file.arrayBuffer()
+    if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { success: false, error: `File too large. Maximum size is 50MB, got ${(arrayBuffer.byteLength / 1024 / 1024).toFixed(1)}MB` },
+        { status: 413 }
+      )
+    }
     const data = new Uint8Array(arrayBuffer)
 
     // 3. Create signer with private key
