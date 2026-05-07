@@ -61,9 +61,8 @@ export function SimilarPrompts({ promptId }: { promptId: string }) {
   return (
     <div className="mt-12">
       <div className="flex items-center gap-2 mb-6">
-        <Sparkles className="w-5 h-5 text-[#00ffff]" />
-        <h3 className="text-lg font-display font-bold text-white">Similar Prompts</h3>
-        <span className="text-xs text-white/40 ml-2">Powered by 0G Compute</span>
+        <h3 className="text-2xl font-display font-bold text-white">Similar Prompts</h3>
+        <span className="text-l text-white/40 ml-2">Powered by 0G Compute</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {prompts.slice(0, 6).map((prompt) => (

@@ -285,20 +285,18 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                 <img
                                     src={prompt.image}
                                     alt={prompt.title}
-                                    className="absolute inset-0 w-full h-full object-cover opacity-80"
+                                    className="absolute inset-0 w-full h-full object-cover opacity-80 pointer-events-none select-none"
+                                    draggable={false}
+                                    onContextMenu={(e) => e.preventDefault()}
                                     onError={(e) => {
                                         (e.target as HTMLImageElement).style.opacity = '0';
                                     }}
                                 />
                             )}
-                            {/* Diagonal Watermark */}
-                            <div className="absolute inset-0 flex items-center justify-center -rotate-[15deg] pointer-events-none opacity-10 z-10 select-none">
-                                <span className="text-[6rem] md:text-[8rem] font-display font-black tracking-tighter uppercase leading-none text-white whitespace-nowrap">
-                                    PREVIEW
-                                </span>
-                            </div>
+                            {/* Overlay to prevent right-click open image in new tab */}
+                            <div className="absolute inset-0 z-[1]" onContextMenu={(e) => e.preventDefault()} />
 
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#ff2d95]/15 via-[#a855f7]/10 to-[#00ffff]/15 flex items-center justify-center">
+                            <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="text-center relative z-10">
                                     {premiumContent ? (
                                         <>
@@ -313,15 +311,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                     )}
                                 </div>
                             </div>
-                            <div className="absolute inset-0 y2k-grid-bg opacity-30" aria-hidden="true" />
-                            <div className="absolute inset-0" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(180,120,255,0.02) 3px, rgba(180,120,255,0.02) 6px)' }} aria-hidden="true" />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-5" aria-hidden="true">
-                                <p className="text-6xl font-extrabold text-white rotate-[-20deg] select-none">PromptHub</p>
-                            </div>
-                            <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-[#ff2d95]/30 rounded-tl z-20" />
-                            <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-[#00ffff]/30 rounded-tr z-20" />
-                            <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-[#b4ff39]/30 rounded-bl z-20" />
-                            <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-[#a855f7]/30 rounded-br z-20" />
+
                         </div>
 
                         <div className="mt-8">
@@ -546,7 +536,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                             <div>
                                                                 <p className="text-sm font-bold text-[#e0d4ff] flex items-center gap-1">
                                                                     {review.reviewer?.name || (review.reviewer_address ? `${review.reviewer_address.slice(0, 6)}...${review.reviewer_address.slice(-4)}` : "User")}
-                                                                     {review.reviewer?.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#00ffff]" />}
+                                                                    {review.reviewer?.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#00ffff]" />}
                                                                 </p>
                                                                 <p className="text-xs text-[#a78bfa]/50 font-mono">{new Date(review.created_at).toLocaleDateString()}</p>
                                                             </div>
@@ -778,7 +768,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                             const newHash = window.prompt("Enter new 0G Storage root hash for updated content:")
                                                             if (!newHash || !newHash.trim()) return
                                                             const newUri = window.prompt("Enter new metadata URI (or press Enter to keep current):", prompt.cid || "")
-                                                            
+
                                                             setIsActionLoading(true)
                                                             try {
                                                                 const marketplace = await getMarketplaceContract()
@@ -945,17 +935,6 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                         </div>
                     </div>
                 </div>
-
-                {related.length > 0 && (
-                    <section className="mt-16">
-                        <h2 className="text-2xl font-extrabold text-[#e0d4ff] mb-6">Related Prompts</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {related.map((p) => (
-                                <PromptCard key={p.id} prompt={p} />
-                            ))}
-                        </div>
-                    </section>
-                )}
 
                 {/* AI-Powered Similar Prompts */}
                 {prompt && <SimilarPrompts promptId={String(prompt.id)} />}

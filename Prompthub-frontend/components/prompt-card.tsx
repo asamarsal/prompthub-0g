@@ -84,7 +84,9 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
             <img
               src={prompt.watermarkedPreviewUrl || prompt.image}
               alt={prompt.title}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 pointer-events-none select-none"
+              draggable={false}
+              onContextMenu={(e) => e.preventDefault()}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 if (!target.src.includes('unsplash')) {
@@ -95,6 +97,8 @@ export function PromptCard({ prompt }: { prompt: Prompt & { isBookmarked?: boole
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-[#1a1c23] to-[#161218]" />
           )}
+          {/* Transparent overlay to prevent right-click "Open image in new tab" */}
+          <div className="absolute inset-0 z-[1]" onContextMenu={(e) => e.preventDefault()} />
 
 
           {prompt.isCurated && (
