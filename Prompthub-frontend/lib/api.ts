@@ -6,6 +6,7 @@
 
 import axios from "axios"
 import type { AxiosInstance } from "axios"
+import { getMarketplaceContract } from "@/lib/evm"
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 const TOKEN_KEY = "prompthub_api_token"
@@ -54,9 +55,53 @@ const x402Api = axios.create({
     },
 })
 
-function wrapAxiosWithPayment(api: AxiosInstance, _account: any) {
-    // x402 adapter placeholder for EVM migration.
-    // Keeps the same call-site contract while backend payment gating is being migrated.
+function wrapAxiosWithPayment(api: AxiosInstance, account: any) {
+    if (!account?.enableX402Payment) {
+        return api
+    }
+
+    api.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            const response = error?.response
+            const originalRequest = error?.config
+            if (!response || response.status !== 402 || originalRequest?._x402Retry) {
+                throw error
+            }
+
+            const encoded = response.headers?.["payment-required"]
+            if (!encoded) {
+                throw error
+            }
+
+            let requirements: any = null
+            try {
+                const decoded = atob(encoded)
+                requirements = JSON.parse(decoded)?.paymentRequirements
+            } catch {
+                throw error
+            }
+
+            const contractId = requirements?.contractId
+            const amount = requirements?.amount
+            if (!contractId || !amount) {
+                throw error
+            }
+
+            const marketplace = await getMarketplaceContract()
+            const tx = await marketplace.buyPrompt(contractId, { value: BigInt(amount) })
+            await tx.wait()
+
+            originalRequest._x402Retry = true
+            originalRequest.headers = {
+                ...(originalRequest.headers ?? {}),
+                "X-Payment": tx.hash,
+            }
+
+            return api.request(originalRequest)
+        },
+    )
+
     return api
 }
 

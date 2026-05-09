@@ -32,8 +32,6 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                 if (userData?.id) {
                     getArtistReviews(userData.id).then(r => setReviews(r?.data || []))
                 }
-            })
-            .then(([userData]) => {
                 if (userData?.wallet_address) {
                     checkAgentVerified(userData.wallet_address).then(setAgentVerified)
                 }
@@ -70,7 +68,8 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
         hourlyRate: user.hourly_rate || 0.002,
         currency: user.hourly_rate_currency || "0G",
         tools: user.tools && user.tools.length > 0 ? user.tools : ['Midjourney v6', 'DALL-E 3'],
-        specialties: user.specialties && user.specialties.length > 0 ? user.specialties : ['AI Artist']
+        specialties: user.specialties && user.specialties.length > 0 ? user.specialties : ['AI Artist'],
+        isVerified: agentVerified,
     }
 
     const handleFundEscrow = async () => {
@@ -175,7 +174,7 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                                 <div>
                                     <div className="flex items-center gap-1.5">
                                         <span className="font-extrabold text-white uppercase">{artist.name}</span>
-                                        {(artist.is_verified || agentVerified) && <BadgeCheck className="w-4 h-4 text-[#00ffff]" />}
+                                        {artist.isVerified && <BadgeCheck className="w-4 h-4 text-[#00ffff]" />}
                                     </div>
                                     <span className="text-xs font-mono text-[#a78bfa]">@{artist.handle}</span>
                                 </div>

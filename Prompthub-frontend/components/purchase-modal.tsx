@@ -19,10 +19,12 @@ export function PurchaseModal({
   open,
   onClose,
   prompt,
+  onPurchased,
 }: {
   open: boolean
   onClose: () => void
   prompt: Prompt
+  onPurchased?: (content: string) => void
 }) {
   const { isConnected, address } = useWallet()
   const [state, setState] = useState<PurchaseState>("confirm")
@@ -85,12 +87,21 @@ export function PurchaseModal({
       setTxId(tx.hash);
       toast.success("Transaction broadcasted!");
       await tx.wait();
-      setState("success");
 
       try {
-        await recordTransaction(String(prompt.id), tx.hash);
+        const verified = await recordTransaction(String(prompt.id), tx.hash);
+        const content = verified?.original_content;
+        if (content) {
+          onPurchased?.(content);
+        } else {
+          const unlocked = await fetchPremiumContent(String(prompt.id), { address });
+          onPurchased?.(unlocked.original_content);
+        }
+        toast.success("Prompt content unlocked!");
+        setState("success");
       } catch (error) {
         console.error("Failed to record transaction on backend:", error);
+        throw error;
       }
     } catch (e: any) {
       console.error("Purchase error detailed:", e)
@@ -146,12 +157,8 @@ export function PurchaseModal({
   }
 
   const handleClose = () => {
-    if (state === "success") {
-      window.location.reload()
-    } else {
-      setState("confirm")
-      onClose()
-    }
+    setState("confirm")
+    onClose()
   }
 
   return (

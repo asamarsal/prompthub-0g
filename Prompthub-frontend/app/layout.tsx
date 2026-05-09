@@ -1,12 +1,8 @@
 import type { Metadata, Viewport } from 'next'
-import { Outfit, Oxanium } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
 import './globals.css'
-
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
-const oxanium = Oxanium({ subsets: ["latin"], variable: "--font-display" });
 
 import { WalletProvider } from '@/lib/wallet-context'
 
@@ -64,7 +60,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${outfit.variable} ${oxanium.variable} font-sans antialiased overflow-x-hidden`} suppressHydrationWarning>
+      <body className="font-sans antialiased overflow-x-hidden" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange={false}>
           <WalletProvider>
             {children}

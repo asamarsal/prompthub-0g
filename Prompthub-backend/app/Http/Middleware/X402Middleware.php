@@ -3,15 +3,19 @@
 namespace App\Http\Middleware;
 
 use App\Models\Prompt;
+use App\Services\X402PaymentVerifier;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response;
 
 class X402Middleware
 {
+    public function __construct(private X402PaymentVerifier $verifier)
+    {
+    }
+
     /**
      * Handle an incoming request.
      * x402-like payment gating adapted for 0G EVM transactions.
@@ -25,6 +29,10 @@ class X402Middleware
         $ownerAddress = $this->normalizeAddress((string) ($prompt->user?->wallet_address ?? ''));
         $marketplaceAddress = $this->normalizeAddress((string) config('0g.marketplace_contract_address'));
         $requiredWei = $this->toWeiString((string) $prompt->price_0g);
+
+        if ($user && $user->id === $prompt->user_id) {
+            return $next($request);
+        }
 
         // 1) Fast path: already purchased in local transaction table
         if ($user) {
@@ -54,40 +62,20 @@ class X402Middleware
             }
 
             try {
-                $txRes = Http::timeout(15)->post(config('0g.rpc_url'), [
-                    'jsonrpc' => '2.0',
-                    'method' => 'eth_getTransactionReceipt',
-                    'params' => [$txId],
-                    'id' => 1,
-                ]);
-
-                if ($txRes->successful()) {
-                    $receipt = $txRes->json('result');
-                    $isConfirmed = $receipt && (($receipt['status'] ?? null) === '0x1');
-                    $txTo = $this->normalizeAddress((string) ($receipt['to'] ?? ''));
-                    $buyer = $this->normalizeAddress((string) ($receipt['from'] ?? ''));
-
-                    $isValidPayment = $isConfirmed
-                        && (!$marketplaceAddress || $txTo === $marketplaceAddress)
-                        && (!$user || $buyer === $this->normalizeAddress((string) $user->wallet_address));
-
-                    if ($isValidPayment) {
+                $expectedBuyer = $user ? (string) $user->wallet_address : null;
+                $verification = $this->verifier->verifyPromptPurchase($prompt, $txId, $expectedBuyer);
+                if ($verification['valid'] ?? false) {
+                    $record = $this->verifier->recordPurchase($prompt, $verification, 'x402_middleware');
+                    if ($record['valid'] ?? false) {
                         Cache::put($cacheKey, true, now()->addDays(30));
-
-                        if ($buyer) {
-                            \App\Models\Transaction::firstOrCreate(
-                                ['tx_id' => $txId],
-                                [
-                                    'buyer_address' => $buyer,
-                                    'prompt_id' => $promptId,
-                                    'amount_paid' => $prompt->price_0g,
-                                    'currency' => '0G',
-                                ]
-                            );
-                        }
 
                         return $next($request);
                     }
+
+                    return response()->json([
+                        'message' => 'Invalid payment transaction.',
+                        'error' => $record['reason'] ?? 'x402_record_failed',
+                    ], 402);
                 }
             } catch (\Exception $e) {
                 \Log::warning('x402: RPC check failed: ' . $e->getMessage());
@@ -102,6 +90,9 @@ class X402Middleware
                 'asset' => '0G',
                 'payTo' => $ownerAddress ?: ($marketplaceAddress ?: ''),
                 'network' => 'eip155:' . (string) config('0g.chain_id', 16602),
+                'promptId' => (string) $prompt->id,
+                'contractId' => $prompt->contract_id,
+                'marketplace' => $marketplaceAddress ?: '',
             ],
         ];
         $encodedData = base64_encode(json_encode($paymentData));
@@ -132,27 +123,6 @@ class X402Middleware
 
     private function toWeiString(string $amount): string
     {
-        if (!extension_loaded('bcmath')) {
-            $floatWei = (float) $amount * 1e18;
-            return number_format($floatWei, 0, '', '');
-        }
-
-        $normalized = trim($amount);
-        if ($normalized === '') {
-            return '0';
-        }
-
-        if (!str_contains($normalized, '.')) {
-            return bcmul($normalized, '1000000000000000000', 0);
-        }
-
-        [$int, $dec] = explode('.', $normalized, 2);
-        $dec = substr(str_pad($dec, 18, '0'), 0, 18);
-
-        return bcadd(
-            bcmul($int === '' ? '0' : $int, '1000000000000000000', 0),
-            $dec,
-            0
-        );
+        return $this->verifier->toWeiString($amount);
     }
 }

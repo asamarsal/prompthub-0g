@@ -218,7 +218,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
 
         setUnlockLoading(true)
         try {
-            const res = await fetchPremiumContent(prompt.id, { address })
+            const res = await fetchPremiumContent(prompt.id, { address, enableX402Payment: true })
             setPremiumContent(res.original_content)
             toast.success("Content Unlocked!", {
                 description: "Your premium prompt content has been decrypted.",
@@ -375,7 +375,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                     <p className="text-sm text-[#a78bfa]/70 mb-8 max-w-sm mx-auto leading-relaxed">
                                                         {premiumContent
                                                             ? "You have full access to the precise prompt string, seed values, and parameters."
-                                                            : "Unlock the precise prompt string, seed values, and negative parameters using the x402 protocol."}
+                                                            : "Unlock the precise prompt string, seed values, and negative parameters after verified 0G payment."}
                                                     </p>
                                                     {!premiumContent && (
                                                         <button
@@ -388,13 +388,13 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                                     <Zap className="w-4 h-4 animate-spin" /> Verifying Payment...
                                                                 </span>
                                                             ) : isConnected ? (
-                                                                `Unlock for ${prompt.price} 0G (x402)`
+                                                                `Unlock for ${prompt.price} 0G`
                                                             ) : (
                                                                 "Connect Wallet to Access"
                                                             )}
                                                         </button>
                                                     )}
-                                                    <p className="mt-4 text-[10px] text-[#a78bfa]/40 font-mono uppercase tracking-widest">Powered by x402-0g</p>
+                                                    <p className="mt-4 text-[10px] text-[#a78bfa]/40 font-mono uppercase tracking-widest">Secured by x402-0g verification</p>
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-5 duration-700">
@@ -940,7 +940,15 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                 {prompt && <SimilarPrompts promptId={String(prompt.id)} />}
             </div>
 
-            <PurchaseModal open={purchaseOpen} onClose={() => setPurchaseOpen(false)} prompt={prompt} />
+            <PurchaseModal
+                open={purchaseOpen}
+                onClose={() => setPurchaseOpen(false)}
+                prompt={prompt}
+                onPurchased={(content) => {
+                    setPremiumContent(content)
+                    setPurchaseOpen(false)
+                }}
+            />
         </AppShell>
     )
 }

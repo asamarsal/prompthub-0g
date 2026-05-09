@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prompt;
+use App\Services\X402PaymentVerifier;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class PromptController extends Controller
 {
+    public function __construct(private X402PaymentVerifier $x402Verifier)
+    {
+    }
+
     public function index(Request $request)
     {
         $query = Prompt::with('user')->where('is_published', true);
@@ -148,57 +152,34 @@ class PromptController extends Controller
         ]);
 
         $prompt = Prompt::findOrFail($id);
-        $txId = $this->normalizeTxHash($request->tx_id);
-        if (!$txId) {
-            return response()->json(['message' => 'Invalid tx hash'], 422);
-        }
+        $user = $request->user();
+        $expectedBuyer = $user?->wallet_address;
 
         try {
-            $rpcUrl = config('0g.rpc_url');
-            $receiptRes = Http::timeout(15)->post($rpcUrl, [
-                'jsonrpc' => '2.0',
-                'method' => 'eth_getTransactionReceipt',
-                'params' => [$txId],
-                'id' => 1,
-            ]);
-            if (!$receiptRes->successful()) {
-                return response()->json(['message' => 'RPC request failed'], 502);
+            $verification = $this->x402Verifier->verifyPromptPurchase($prompt, $request->tx_id, $expectedBuyer);
+            if (!($verification['valid'] ?? false)) {
+                $status = ($verification['reason'] ?? null) === 'receipt_not_found' ? 202 : 422;
+
+                return response()->json([
+                    'message' => 'Purchase verification failed',
+                    'error' => $verification['reason'] ?? 'invalid_payment',
+                ], $status);
             }
 
-            $receipt = $receiptRes->json('result');
-            if (!$receipt) {
-                return response()->json(['message' => 'Transaction not mined yet'], 202);
+            $record = $this->x402Verifier->recordPurchase($prompt, $verification, 'verify_purchase_endpoint');
+            if (!($record['valid'] ?? false)) {
+                return response()->json([
+                    'message' => 'Purchase transaction cannot be recorded',
+                    'error' => $record['reason'] ?? 'record_failed',
+                ], 409);
             }
-
-            if (($receipt['status'] ?? null) !== '0x1') {
-                return response()->json(['message' => 'Transaction failed on-chain'], 400);
-            }
-
-            $marketplaceAddress = strtolower((string) config('0g.marketplace_contract_address'));
-            $txTo = strtolower((string) ($receipt['to'] ?? ''));
-            if ($marketplaceAddress && $marketplaceAddress !== '0x' && $txTo && $txTo !== $marketplaceAddress) {
-                return response()->json(['message' => 'Transaction target mismatch'], 422);
-            }
-
-            $buyerAddress = $this->normalizeAddress((string) ($receipt['from'] ?? ''));
-            if (!$buyerAddress) {
-                return response()->json(['message' => 'Unable to read buyer address from tx'], 422);
-            }
-
-            \App\Models\Transaction::updateOrCreate(
-                ['tx_id' => $txId],
-                [
-                    'buyer_address' => $buyerAddress,
-                    'prompt_id' => $prompt->id,
-                    'amount_paid' => $prompt->price_0g,
-                    'currency' => $prompt->currency ?? '0G',
-                ]
-            );
 
             return response()->json([
                 'message' => 'Purchase verified and recorded',
                 'tx_status' => 'success',
                 'prompt_id' => $prompt->id,
+                'contract_token_id' => $verification['tokenId'],
+                'buyer_address' => $verification['buyer'],
                 'original_content' => $prompt->original_content ?? 'Sample prompt content for demonstration.',
                 'root_hash' => $prompt->root_hash,
                 'content_hash' => $prompt->original_content ? hash('sha256', $prompt->original_content) : null,

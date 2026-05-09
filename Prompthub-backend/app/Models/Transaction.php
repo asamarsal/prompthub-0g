@@ -10,8 +10,17 @@ class Transaction extends Model
         'tx_id',
         'buyer_address',
         'prompt_id',
+        'contract_token_id',
+        'seller_address',
         'amount_paid',
+        'amount_paid_wei',
         'currency',
+        'verified_at',
+        'verification_source',
+    ];
+
+    protected $casts = [
+        'verified_at' => 'datetime',
     ];
 
     public function prompt()
