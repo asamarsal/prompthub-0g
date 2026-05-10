@@ -3,10 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Contest;
+use App\Services\OnChainVerificationService;
 use Illuminate\Http\Request;
 
 class ContestController extends Controller
 {
+    public function __construct(private OnChainVerificationService $onChainVerifier)
+    {
+    }
+
     public function index()
     {
         return response()->json(Contest::withCount('submissions')->whereIn('status', ['OPEN', 'PENDING_FUNDING', 'JUDGING'])->orderBy('created_at', 'desc')->get());
@@ -60,36 +65,42 @@ class ContestController extends Controller
         if (!str_starts_with($txId, '0x')) $txId = '0x' . $txId;
 
         try {
-            $rpcUrl = config('0g.rpc_url');
-            $receiptRes = \Illuminate\Support\Facades\Http::timeout(15)->post($rpcUrl, [
-                'jsonrpc' => '2.0',
-                'method'  => 'eth_getTransactionReceipt',
-                'params'  => [$txId],
-                'id'      => 1,
-            ]);
+            $verification = $this->onChainVerifier->verifyContestFunded(
+                $txId,
+                $contest->brand_address,
+                $contest->total_prize_0g,
+                count($contest->prize_tiers ?? [])
+            );
 
-            if (!$receiptRes->successful()) {
-                return response()->json(['message' => 'RPC request failed'], 502);
+            if (!($verification['valid'] ?? false)) {
+                if (($verification['reason'] ?? null) === 'receipt_not_found') {
+                    return response()->json(['message' => 'Transaction not mined yet'], 202);
+                }
+
+                return response()->json([
+                    'message' => 'Contest funding verification failed',
+                    'error' => $verification['reason'] ?? 'invalid_funding_event',
+                    'details' => $verification,
+                ], 422);
             }
 
-            $receipt = $receiptRes->json('result');
-            if (!$receipt) {
+            if (empty($verification['contestId'])) {
                 return response()->json(['message' => 'Transaction not mined yet'], 202);
-            }
-
-            if (($receipt['status'] ?? null) !== '0x1') {
-                return response()->json(['message' => 'Transaction failed on-chain'], 400);
             }
 
             $contest->update([
                 'status' => 'OPEN',
                 'tx_id'  => $txId,
+                'onchain_contest_id' => (int) $verification['contestId'],
+                'contest_contract_address' => $verification['contractAddress'] ?? config('0g.contests_contract_address'),
+                'funding_verified_at' => now(),
             ]);
 
             return response()->json([
                 'message'    => 'Contest funding verified on-chain. Contest is now OPEN.',
                 'tx_status'  => 'success',
                 'contest_id' => $contest->id,
+                'onchain_contest_id' => $contest->onchain_contest_id,
             ]);
         } catch (\Exception $e) {
             \Log::error("verifyFund error: " . $e->getMessage());
@@ -110,10 +121,45 @@ class ContestController extends Controller
     {
         $request->validate([
             'submission_id' => 'required|uuid|exists:contest_submissions,id',
+            'tx_id' => 'required|string',
+            'place' => 'nullable|integer|min:1',
         ]);
 
         $contest = Contest::findOrFail($id);
         $submission = \App\Models\ContestSubmission::findOrFail($request->submission_id);
+        if ($submission->contest_id !== $contest->id) {
+            return response()->json(['message' => 'Submission does not belong to this contest'], 422);
+        }
+
+        if (!$contest->onchain_contest_id) {
+            return response()->json(['message' => 'Contest has no verified on-chain contest id'], 422);
+        }
+
+        $place = (int) ($request->input('place') ?: 1);
+
+        try {
+            $verification = $this->onChainVerifier->verifyWinnerDeclared(
+                $request->input('tx_id'),
+                $contest->onchain_contest_id,
+                $submission->artist_address,
+                $place
+            );
+
+            if (!($verification['valid'] ?? false)) {
+                if (($verification['reason'] ?? null) === 'receipt_not_found') {
+                    return response()->json(['message' => 'Transaction not mined yet'], 202);
+                }
+
+                return response()->json([
+                    'message' => 'Winner declaration verification failed',
+                    'error' => $verification['reason'] ?? 'invalid_winner_event',
+                    'details' => $verification,
+                ], 422);
+            }
+        } catch (\Exception $e) {
+            \Log::error("selectWinner verification error: " . $e->getMessage());
+            return response()->json(['message' => 'Verification error: ' . $e->getMessage()], 500);
+        }
 
         // Update submission as winner
         $submission->update(['is_winner' => true]);
@@ -121,7 +167,9 @@ class ContestController extends Controller
         // Update contest status and winner reference
         $contest->update([
             'status' => 'COMPLETED',
-            'winner_submission_id' => $submission->id
+            'winner_submission_id' => $submission->id,
+            'winner_tx_id' => strtolower($request->input('tx_id')),
+            'winner_verified_at' => now(),
         ]);
 
         return response()->json([

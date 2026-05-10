@@ -19,6 +19,7 @@ class PlagiarismController extends Controller
      */
     public function check(Request $request): JsonResponse
     {
+        Log::info('Plagiarism check request received', $request->all());
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',

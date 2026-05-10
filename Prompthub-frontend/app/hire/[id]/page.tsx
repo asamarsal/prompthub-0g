@@ -4,7 +4,7 @@ import { useState, useEffect, use } from "react"
 import Link from "next/link"
 import { Star, BadgeCheck, ArrowLeft, Loader2 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
-import { fetchUserByAddress, ApiUser, getPrompts, getArtistReviews, createHireRequest, verifyHireEscrow } from "@/lib/api"
+import { fetchUserByAddress, ApiUser, getPrompts, getArtistReviews, createHireRequest, verifyHireEscrow, verifyHireCompletion, fetchMyHireRequests } from "@/lib/api"
 import { useWallet } from "@/lib/wallet-context"
 import { parseEther } from "ethers"
 import { getEscrowContract, checkAgentVerified } from "@/lib/evm"
@@ -19,6 +19,8 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
     const [fundingEscrow, setFundingEscrow] = useState(false)
     const [completingJob, setCompletingJob] = useState(false)
     const [onChainJobId, setOnChainJobId] = useState<number | null>(null)
+    const [currentHireId, setCurrentHireId] = useState<string | null>(null)
+    const [activeHire, setActiveHire] = useState<any>(null)
     const [agentVerified, setAgentVerified] = useState(false)
 
     useEffect(() => {
@@ -26,7 +28,7 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
             fetchUserByAddress(id),
             getPrompts({ user_address: id })
         ])
-            .then(([userData, promptsData]) => {
+            .then(async ([userData, promptsData]) => {
                 setUser(userData)
                 setPortfolio(promptsData?.data || [])
                 if (userData?.id) {
@@ -34,6 +36,19 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                 }
                 if (userData?.wallet_address) {
                     checkAgentVerified(userData.wallet_address).then(setAgentVerified)
+                    fetchMyHireRequests()
+                        .then((requests) => {
+                            const match = requests.find((h: any) => {
+                                const sameArtist = String(h.artist_address || "").toLowerCase() === String(userData.wallet_address).toLowerCase()
+                                return sameArtist && ["PENDING_FUNDING", "IN_PROGRESS", "ACCEPTED"].includes(String(h.status || ""))
+                            })
+                            if (match) {
+                                setActiveHire(match)
+                                setCurrentHireId(match.id)
+                                if (match.onchain_job_id) setOnChainJobId(Number(match.onchain_job_id))
+                            }
+                        })
+                        .catch(() => null)
                 }
             })
             .catch(err => console.error("Missing artist record:", err))
@@ -97,16 +112,17 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
             const tx = await escrow.createJob(user.wallet_address, {
                 value: parseEther(String(budget))
             })
-            await tx.wait()
-
-            // Parse jobId from the tx receipt logs
             const receipt = await tx.wait()
-            const jobCreatedEvent = receipt?.logs?.[0]
-            if (jobCreatedEvent) {
+            let parsedJobId: number | undefined
+            for (const log of receipt?.logs || []) {
                 try {
                     const iface = escrow.interface
-                    const parsed = iface.parseLog({ topics: [...jobCreatedEvent.topics], data: jobCreatedEvent.data })
-                    if (parsed?.args?.[0]) setOnChainJobId(Number(parsed.args[0]))
+                    const parsed = iface.parseLog({ topics: [...log.topics], data: log.data })
+                    if (parsed?.name === "JobCreated" && parsed?.args?.[0]) {
+                        parsedJobId = Number(parsed.args[0])
+                        setOnChainJobId(parsedJobId)
+                        break
+                    }
                 } catch {}
             }
 
@@ -115,9 +131,12 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
                 project_brief: projectBrief.trim(),
                 budget_0g: budget,
                 tx_id: tx.hash,
+                onchain_job_id: parsedJobId,
             })
             if (created?.id) {
-                await verifyHireEscrow(created.id, tx.hash)
+                setCurrentHireId(created.id)
+                const verified = await verifyHireEscrow(created.id, tx.hash)
+                setActiveHire({ ...created, status: "IN_PROGRESS", onchain_job_id: verified?.onchain_job_id || parsedJobId })
             }
             alert("Escrow funded and hire request created!")
         } catch (err: any) {
@@ -129,19 +148,20 @@ export default function ArtistPage({ params }: { params: Promise<{ id: string }>
     }
 
     const handleCompleteJob = async () => {
-        if (!onChainJobId) {
-            const jobIdInput = window.prompt("Enter the on-chain Job ID to complete:")
-            if (!jobIdInput || isNaN(Number(jobIdInput))) return
-            setOnChainJobId(Number(jobIdInput))
+        const jobId = onChainJobId || Number(activeHire?.onchain_job_id)
+        const hireId = currentHireId || activeHire?.id
+        if (!jobId || !hireId) {
+            alert("No verified active hire found for this artist. Fund escrow or refresh your hire request list first.")
+            return
         }
-        const jobId = onChainJobId || Number(window.prompt("Job ID:"))
-        if (!jobId) return
 
         setCompletingJob(true)
         try {
             const escrow = await getEscrowContract()
             const tx = await escrow.completeJob(jobId)
             await tx.wait()
+            await verifyHireCompletion(hireId, tx.hash)
+            setActiveHire((prev: any) => prev ? { ...prev, status: "COMPLETED", completion_tx_id: tx.hash } : prev)
             alert("Job completed! Funds released to artist.")
         } catch (err: any) {
             console.error(err)

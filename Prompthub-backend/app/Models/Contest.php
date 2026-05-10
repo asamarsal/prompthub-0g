@@ -13,7 +13,9 @@ class Contest extends Model
         'id', 'brand_address', 'title', 'brand_name', 'category',
         'about_brand', 'brief', 'tags', 'require_prompt_submission',
         'prize_tiers', 'total_prize_0g', 'deadline', 'status',
-        'tx_id', 'onchain_contest_id', 'winner_submission_id'
+        'tx_id', 'onchain_contest_id', 'contest_contract_address',
+        'funding_verified_at', 'winner_tx_id', 'winner_verified_at',
+        'winner_submission_id'
     ];
 
     protected $casts = [
@@ -23,6 +25,8 @@ class Contest extends Model
         'total_prize_0g' => 'decimal:8',
         'deadline' => 'datetime',
         'onchain_contest_id' => 'integer',
+        'funding_verified_at' => 'datetime',
+        'winner_verified_at' => 'datetime',
     ];
 
     public function submissions()

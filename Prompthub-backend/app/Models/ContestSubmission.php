@@ -10,7 +10,9 @@ class ContestSubmission extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id', 'contest_id', 'artist_address', 'cid_ipfs', 'preview_image_url', 'is_winner'
+        'id', 'contest_id', 'artist_address', 'cid_ipfs', 'preview_image_url',
+        'prompt_used', 'tool', 'storage_root_hash', 'storage_tx_hash',
+        'ipfs_metadata_uri', 'onchain_entry_id', 'is_winner'
     ];
 
     protected $casts = [

@@ -4,7 +4,7 @@ import { use, useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { ArrowLeft, Trophy, Clock, Users, BadgeCheck, Upload, Loader2, CheckCircle } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
-import { getContest, getContestSubmissions, submitContestEntry, declareContestWinner, uploadFile, uploadTo0GStorage } from "@/lib/api"
+import { getContest, getContestSubmissions, submitContestEntry, declareContestWinner, uploadPromptAsset, uploadMetadata, uploadTo0GStorage } from "@/lib/api"
 import { useWallet } from "@/lib/wallet-context"
 import { truncateAddress } from "@/lib/utils"
 import { getContestsContract } from "@/lib/evm"
@@ -36,7 +36,8 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
     const [previewUrl, setPreviewUrl] = useState("")
     const [prompt, setPrompt] = useState("")
     const [tool, setTool] = useState("")
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [previewImageFile, setPreviewImageFile] = useState<File | null>(null)
+    const [promptTxtFile, setPromptTxtFile] = useState<File | null>(null)
 
     const fetchData = useCallback(async () => {
         try {
@@ -67,15 +68,33 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setSelectedFile(e.target.files[0])
-            setPreviewUrl(URL.createObjectURL(e.target.files[0]))
+            const file = e.target.files[0]
+            if (!file.type.startsWith("image/")) {
+                alert("Preview file must be an image.")
+                e.target.value = ""
+                return
+            }
+            setPreviewImageFile(file)
+            setPreviewUrl(URL.createObjectURL(file))
+        }
+    }
+
+    const handlePromptTxtChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0]
+            if (!file.name.toLowerCase().endsWith(".txt") && file.type !== "text/plain") {
+                alert("Prompt proof must be a .txt file.")
+                e.target.value = ""
+                return
+            }
+            setPromptTxtFile(file)
         }
     }
 
     const handleSubmitEntry = async () => {
         if (!myAddress) return alert("Connect wallet first")
-        if (!selectedFile && !previewUrl) return alert("Please provide a preview")
-        if (contest?.require_prompt_submission && !prompt.trim()) {
+        if (!previewImageFile && !previewUrl) return alert("Please provide a preview image or URL")
+        if (contest?.require_prompt_submission && !prompt.trim() && !promptTxtFile) {
             return alert("This contest requires prompt submission.")
         }
 
@@ -83,31 +102,42 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
         try {
             let finalImageUrl = previewUrl
 
-            // 1. Upload to backend/IPFS if file selected
-            if (selectedFile) {
-                const uploadRes = await uploadFile(selectedFile, "prompt")
+            // 1. Upload preview image to backend cache only. Pinata is reserved for text metadata/JSON.
+            if (previewImageFile) {
+                const uploadRes = await uploadPromptAsset(previewImageFile)
                 finalImageUrl = uploadRes.url
             }
             if (!finalImageUrl || finalImageUrl.startsWith("blob:")) {
                 throw new Error("Invalid preview URL. Please upload a valid image.")
             }
 
-            // 2. Upload canonical submission payload to 0G Storage (entry proof)
+            let storageRootHash = ""
+            let storageTxHash: string | null = null
+            if (promptTxtFile) {
+                const storageRes = await uploadTo0GStorage(promptTxtFile, "attachment", true)
+                storageRootHash = storageRes.rootHash
+                storageTxHash = storageRes.txHash
+            }
+
+            // 2. Upload canonical text metadata JSON to Pinata.
             const entryPayload = {
                 contest_id: id,
                 artist_address: myAddress,
                 preview_image_url: finalImageUrl,
-                prompt_used: prompt || undefined,
+                prompt_used: prompt || (promptTxtFile ? promptTxtFile.name : undefined),
                 tool: tool || undefined,
+                prompt_txt_name: promptTxtFile?.name,
+                storage_root_hash: storageRootHash || undefined,
                 submitted_at: new Date().toISOString(),
             }
-            const entryFile = new File(
-                [JSON.stringify(entryPayload, null, 2)],
-                `contest-entry-${Date.now()}.json`,
-                { type: "application/json" }
-            )
-            const storageRes = await uploadTo0GStorage(entryFile, "attachment")
-            const entryId = storageRes.rootHash
+            const metadataRes = await uploadMetadata({
+                name: `Contest Entry ${id}`,
+                description: prompt || `Submission for ${contest?.title || "contest"}`,
+                image: finalImageUrl,
+                properties: entryPayload,
+            })
+            const metadataUri = metadataRes.ipfs_uri
+            const entryId = storageRootHash || metadataUri
 
             // 3. Call Smart Contract
             const onchainContestId = resolveOnchainContestId()
@@ -119,15 +149,20 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
             await submitContestEntry(id, {
                 artist_address: myAddress,
                 preview_image_url: finalImageUrl,
-                cid_ipfs: entryId,
-                prompt_used: prompt || undefined,
+                cid_ipfs: metadataUri,
+                prompt_used: prompt || (promptTxtFile ? promptTxtFile.name : undefined),
                 tool: tool || undefined,
+                storage_root_hash: storageRootHash || undefined,
+                storage_tx_hash: storageTxHash || undefined,
+                ipfs_metadata_uri: metadataUri,
+                onchain_entry_id: entryId,
             })
             setShowSubmit(false)
             setPreviewUrl("")
             setPrompt("")
             setTool("")
-            setSelectedFile(null)
+            setPreviewImageFile(null)
+            setPromptTxtFile(null)
             fetchData()
             alert("Submission successful!")
         } catch (err) {
@@ -147,7 +182,7 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
             const contests = await getContestsContract()
             const tx = await contests.declareWinner(onchainContestId, 1, sub.artist_address)
             await tx.wait()
-            await declareContestWinner(id, sub.id)
+            await declareContestWinner(id, sub.id, tx.hash, 1)
             fetchData()
             alert("Winner declared! Funds released.")
         } catch (err) {
@@ -295,7 +330,7 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
                                             <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Click to upload your work</p>
                                         </>
                                     )}
-                                    <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                                 </div>
 
                                 <div>
@@ -309,6 +344,18 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
 
                                 <div>
+                                    <label className="text-xs text-white/40 uppercase tracking-widest font-bold block mb-1.5">Prompt .txt Proof (0G Storage)</label>
+                                    <div className="relative border border-dashed border-[#2a2a30] bg-[#151515] px-4 py-3 text-sm text-white/60 hover:border-[#00ffff] transition-colors">
+                                        <input type="file" accept=".txt,text/plain" onChange={handlePromptTxtChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                        {promptTxtFile ? (
+                                            <span className="font-mono text-[#b4ff39]">{promptTxtFile.name}</span>
+                                        ) : (
+                                            <span>Upload first .txt prompt file for decentralized proof</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
                                     <label className="text-xs text-white/40 uppercase tracking-widest font-bold block mb-1.5">Tool / Model (Optional)</label>
                                     <input value={tool} onChange={e => setTool(e.target.value)} placeholder="e.g. Midjourney v7, FLUX, GPT-4.1" className="w-full px-4 py-3 bg-[#151515] border border-[#2a2a30] text-white text-sm focus:outline-none focus:border-[#00ffff] transition-all" />
                                 </div>
@@ -316,7 +363,7 @@ export default function ContestDetailPage({ params }: { params: Promise<{ id: st
                                 <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-white/5">
                                     <button onClick={() => setShowSubmit(false)} className="px-6 py-3 text-sm font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">Cancel</button>
                                     <button
-                                        disabled={isSubmitting || (!previewUrl && !selectedFile)}
+                                        disabled={isSubmitting || (!previewUrl && !previewImageFile)}
                                         onClick={handleSubmitEntry}
                                         className="px-8 py-3 bg-[#00ffff] text-black font-extrabold uppercase tracking-widest shadow-[4px_4px_0_0_#ffffff] transition-all hover:scale-95 disabled:opacity-30 disabled:grayscale flex items-center gap-2"
                                     >

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Prompt;
 use App\Models\Transaction;
 use App\Models\Review;
+use App\Services\AgentRegistryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
+    public function __construct(private AgentRegistryService $agentRegistry)
+    {
+    }
+
     public function search(Request $request)
     {
         $query = $request->input('q');
@@ -34,7 +39,7 @@ class UserController extends Controller
     public function artists(Request $request)
     {
         $artists = User::whereJsonContains('roles', 'artist')
-            ->select('id', 'name', 'username', 'wallet_address', 'avatar_url', 'cover_url', 'bio', 'is_available_for_freelance', 'hourly_rate', 'hourly_rate_currency', 'roles', 'rating_avg', 'rating_count', 'specialization_id')
+            ->select('id', 'name', 'username', 'wallet_address', 'avatar_url', 'cover_url', 'bio', 'is_available_for_freelance', 'hourly_rate', 'hourly_rate_currency', 'roles', 'rating_avg', 'rating_count', 'specialization_id', 'agent_registered', 'agent_verified', 'agent_avg_rating', 'agent_completed_jobs', 'agent_total_reviews')
             ->get()
             ->map(function ($artist) {
                 return [
@@ -44,11 +49,14 @@ class UserController extends Controller
                     'bio' => $artist->bio ?? 'No bio provided.',
                     'avatar' => $artist->avatar_url,
                     'available' => (bool)$artist->is_available_for_freelance,
-                    'verified' => $this->checkOnChainVerified($artist->wallet_address ?? ''),
+                    'verified' => (bool) $artist->agent_verified,
+                    'agent_registered' => (bool) $artist->agent_registered,
+                    'agent_verified' => (bool) $artist->agent_verified,
                     'specialties' => $artist->getMappedSpecialties(),
                     'tools' => $artist->getMappedTools(),
-                    'rating' => $artist->rating_avg ? (float)$artist->rating_avg : 0,
-                    'reviews' => $artist->rating_count ? (int)$artist->rating_count : 0,
+                    'rating' => $artist->agent_total_reviews ? round(((int) $artist->agent_avg_rating) / 10, 1) : ($artist->rating_avg ? (float)$artist->rating_avg : 0),
+                    'reviews' => $artist->agent_total_reviews ? (int)$artist->agent_total_reviews : ($artist->rating_count ? (int)$artist->rating_count : 0),
+                    'completed_jobs' => (int) $artist->agent_completed_jobs,
                     'hourlyRate' => $artist->hourly_rate ? (float)$artist->hourly_rate : 0.002,
                     'currency' => $artist->hourly_rate_currency ?: '0G',
                     'portfolio' => [
@@ -78,6 +86,9 @@ class UserController extends Controller
             ->firstOrFail();
 
         $authUser = auth('sanctum')->user();
+        if (!$user->agent_synced_at || $user->agent_synced_at->lt(now()->subMinutes(10))) {
+            $user = $this->agentRegistry->syncAgentStatus($user);
+        }
 
         $promptIds = Prompt::where('user_id', $user->id)->pluck('id');
 
@@ -121,6 +132,14 @@ class UserController extends Controller
                 'follower_count' => $followerCount,
                 'following_count' => $followingCount,
             ],
+            'agent_registered' => (bool) $user->agent_registered,
+            'agent_verified' => (bool) $user->agent_verified,
+            'agent_metadata_uri' => $user->agent_metadata_uri,
+            'agent_reputation' => [
+                'avg_rating' => (int) $user->agent_avg_rating,
+                'completed_jobs' => (int) $user->agent_completed_jobs,
+                'total_reviews' => (int) $user->agent_total_reviews,
+            ],
             'is_following' => $isFollowing,
         ]);
     }
@@ -158,6 +177,23 @@ class UserController extends Controller
             Log::warning("Agent verification check failed: " . $e->getMessage());
             return false;
         }
+    }
+
+    public function syncAgentStatus(Request $request)
+    {
+        $user = $this->agentRegistry->syncAgentStatus($request->user());
+
+        return response()->json([
+            'agent_registered' => (bool) $user->agent_registered,
+            'agent_verified' => (bool) $user->agent_verified,
+            'agent_metadata_uri' => $user->agent_metadata_uri,
+            'agent_reputation' => [
+                'avg_rating' => (int) $user->agent_avg_rating,
+                'completed_jobs' => (int) $user->agent_completed_jobs,
+                'total_reviews' => (int) $user->agent_total_reviews,
+            ],
+            'agent_synced_at' => $user->agent_synced_at,
+        ]);
     }
 
     public function toggleFollow(Request $request, $address)

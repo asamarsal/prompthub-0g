@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AppShell } from "@/components/app-shell"
-import { Upload, Check, ChevronRight, ChevronLeft, FileText, Lightbulb, X, Loader2, ExternalLink, AlertTriangle, ImagePlus, ShieldCheck } from "lucide-react"
+import { Upload, Check, ChevronRight, ChevronLeft, FileText, Lightbulb, X, Loader2, ExternalLink, AlertTriangle, ImagePlus, ShieldCheck, Eye, DollarSign, ListChecks, Save, Wand2, FileArchive, FileImage, FileCode, Star, Zap } from "lucide-react"
 import {
   createPrompt,
   getAiModels,
@@ -10,6 +10,7 @@ import {
   uploadMetadata,
   uploadPromptAsset,
   checkPlagiarism,
+  previewPromptScore,
   type ApiAiModel,
   type ApiCategory,
 } from "@/lib/api"
@@ -21,24 +22,31 @@ import { CHAIN_CONFIG } from "@/lib/contracts"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 
 const steps = ["Basic Info", "Pricing & License", "Upload Content", "Preview & Confirm"]
+const DRAFT_KEY = "prompthub:create-draft:v2"
+const PROMPT_VARIABLES = ["{subject}", "{style}", "{color}", "{mood}", "{aspect_ratio}"]
+const MAX_REFERENCE_IMAGES = 10
 // Removed hardcoded FALLBACK_CATEGORIES and FALLBACK_MODELS to ensure data comes only from the API.
 
-function StepIndicator({ current }: { current: number }) {
+function StepIndicator({ current, onStepClick }: { current: number, onStepClick?: (step: number) => void }) {
   return (
     <div className="flex items-center gap-2 mb-10" role="progressbar" aria-valuenow={current + 1} aria-valuemin={1} aria-valuemax={4}>
       {steps.map((label, i) => (
-        <div key={label} className="flex items-center gap-2 flex-1">
+        <div 
+          key={label} 
+          className={`flex items-center gap-2 flex-1 ${onStepClick ? "cursor-pointer group" : ""}`}
+          onClick={() => onStepClick?.(i)}
+        >
           <div
             className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold shrink-0 transition-all ${i < current
               ? "bg-[#b4ff39] text-[#0a001a]"
               : i === current
-                ? "bg-gradient-to-r from-[#ff2d95] to-[#a855f7] text-white glow-pink"
+                ? "bg-transparent border-2 border-[#ff2d95] text-[#ff2d95] shadow-[0_0_10px_rgba(255,45,149,0.3)]"
                 : "glass text-[#a78bfa]/50"
-              }`}
+              } ${onStepClick && i !== current ? "group-hover:scale-110 group-hover:border-[#b4ff39]/50" : ""}`}
           >
             {i < current ? <Check className="w-4 h-4" /> : i + 1}
           </div>
-          <span className={`text-xs font-bold hidden sm:block ${i === current ? "text-[#e0d4ff]" : "text-[#a78bfa]/50"}`}>
+          <span className={`text-xs font-bold hidden sm:block transition-colors ${i === current ? "text-[#e0d4ff]" : "text-[#a78bfa]/50"} ${onStepClick && i !== current ? "group-hover:text-[#b4ff39]" : ""}`}>
             {label}
           </span>
           {i < steps.length - 1 && (
@@ -60,6 +68,11 @@ interface FormData {
   license: "Free" | "Commercial" | "Exclusive"
   royalty: number
   files: File[]
+  promptMode: "upload" | "write"
+  promptText: string
+  negativePrompt: string
+  usageNotes: string
+  commercialUseAllowed: boolean
   previewImageUrl: string
   previewImageFile: File | null
   previewMode: "url" | "upload"
@@ -90,10 +103,15 @@ export default function CreatePageContent() {
     category: "",
     model: "",
     tags: [],
-    price: "0.005",
+    price: "0",
     license: "Commercial",
     royalty: 5,
     files: [],
+    promptMode: "upload",
+    promptText: "",
+    negativePrompt: "",
+    usageNotes: "",
+    commercialUseAllowed: true,
     previewImageUrl: "",
     previewImageFile: null,
     previewMode: "upload",
@@ -103,10 +121,39 @@ export default function CreatePageContent() {
     additionalLinks: [],
     referenceImages: [],
   })
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (previewImage) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = "unset"
+    }
+    return () => {
+      document.body.style.overflow = "unset"
+    }
+  }, [previewImage])
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [plagiarismResult, setPlagiarismResult] = useState<any>(null)
   const [plagiarismChecking, setPlagiarismChecking] = useState(false)
+  const [qualityScore, setQualityScore] = useState<any>(null)
+  const [qualityScoring, setQualityScoring] = useState(false)
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null)
+  const [draftHydrated, setDraftHydrated] = useState(false)
+  const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const fileIcon = (file: File) => {
+    const name = file.name.toLowerCase()
+    if (file.type.startsWith("image/")) return <FileImage className="w-4 h-4 text-[#00ffff] shrink-0" />
+    if (name.endsWith(".zip")) return <FileArchive className="w-4 h-4 text-[#ff6b2b] shrink-0" />
+    return <FileText className="w-4 h-4 text-[#a78bfa] shrink-0" />
+  }
+
+  const formatSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
 
   useEffect(() => {
     let mounted = true
@@ -169,8 +216,72 @@ export default function CreatePageContent() {
     }
   }, [form.previewImageFile])
 
+  useEffect(() => {
+    try {
+      const rawDraft = globalThis.localStorage.getItem(DRAFT_KEY)
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft)
+        setForm((prev) => ({
+          ...prev,
+          ...draft,
+          files: [],
+          previewImageFile: null,
+          referenceImages: [],
+        }))
+        if (draft.savedAt) setDraftSavedAt(draft.savedAt)
+      }
+    } catch (error) {
+      console.warn("Failed to restore create draft", error)
+    } finally {
+      setDraftHydrated(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draftHydrated || deployed) return
+
+    const timer = window.setTimeout(() => {
+      try {
+        const savedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        const { files, previewImageFile, referenceImages, ...serializableForm } = form
+        globalThis.localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...serializableForm, savedAt }))
+        setDraftSavedAt(savedAt)
+      } catch (error) {
+        console.warn("Failed to save create draft", error)
+      }
+    }, 5000)
+
+    return () => window.clearTimeout(timer)
+  }, [draftHydrated, deployed, form])
+
   const update = <K extends keyof FormData>(key: K, val: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }))
+
+  const insertVariable = (variable: string) => {
+    const textarea = promptTextareaRef.current
+    if (!textarea) {
+      update("promptText", `${form.promptText}${variable}`)
+      return
+    }
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const nextValue = `${form.promptText.slice(0, start)}${variable}${form.promptText.slice(end)}`
+    update("promptText", nextValue.slice(0, 1000))
+    window.requestAnimationFrame(() => {
+      textarea.focus()
+      const cursor = Math.min(start + variable.length, 1000)
+      textarea.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  const addPromptFiles = (files: File[]) => {
+    const validFiles = files.filter((file) => file.size <= 50 * 1024 * 1024)
+    if (validFiles.length !== files.length) {
+      alert("Some files were skipped because they are larger than 50MB.")
+    }
+    update("files", [...form.files, ...validFiles].slice(0, 10))
+  }
 
   const addTag = () => {
     const trimmed = tagInput.trim().toLowerCase()
@@ -182,15 +293,72 @@ export default function CreatePageContent() {
 
   const removeTag = (tag: string) => update("tags", form.tags.filter((t) => t !== tag))
 
+  const getPromptTextForScoring = async () => {
+    if (form.promptMode === "write") return form.promptText.trim()
+    const firstTxt = form.files.find((file) => file.name.toLowerCase().endsWith(".txt") || file.type === "text/plain")
+    if (!firstTxt) return form.description.trim()
+    try {
+      return (await firstTxt.text()).trim()
+    } catch {
+      return form.description.trim()
+    }
+  }
+
+  const handlePreviewScore = async () => {
+    setQualityScoring(true)
+    try {
+      const text = await getPromptTextForScoring()
+      if (!text) {
+        alert("Add prompt text or a .txt prompt file before scoring.")
+        return
+      }
+      const result = await previewPromptScore(text)
+      setQualityScore(result)
+    } catch (err: any) {
+      setQualityScore({
+        overall: 0,
+        clarity: 0,
+        completeness: 0,
+        safety: 0,
+        reproducibility: 0,
+        innovation: 0,
+        source: "heuristic",
+        reasoning: `Quality score unavailable: ${err?.message || "unknown error"}`,
+      })
+    } finally {
+      setQualityScoring(false)
+    }
+  }
+
   const handleDeploy = async () => {
-    if (form.files.length === 0) {
+    if (form.promptMode === "upload" && form.files.length === 0) {
       alert("Please upload at least one prompt file first.")
+      return
+    }
+    if (form.promptMode === "write" && form.promptText.trim().length === 0) {
+      alert("Please write your prompt content first.")
+      return
+    }
+    if (form.previewMode !== "upload" || !form.previewImageFile) {
+      alert("Please upload the first preview image file so it can be stored in 0G Storage.")
       return
     }
 
     try {
       setDeploying(true)
       const groupId = crypto.randomUUID().split("-")[0] // Short unique ID
+      const safeTitle = form.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "prompt"
+      const promptFiles = form.promptMode === "write"
+        ? [new File([form.promptText], `${safeTitle}.txt`, { type: "text/plain" })]
+        : form.files
+      const firstTxtFile = form.promptMode === "write"
+        ? promptFiles[0]
+        : promptFiles.find((file) => file.name.toLowerCase().endsWith(".txt") || file.type === "text/plain")
+      if (!firstTxtFile) {
+        alert("Please include at least one .txt prompt file. Only the first .txt prompt file is uploaded to 0G Storage.")
+        setDeploying(false)
+        return
+      }
 
       // 0. Upload Preview Image to backend (local cache for fast display)
       let finalPreviewUrl = form.previewImageUrl
@@ -207,8 +375,8 @@ export default function CreatePageContent() {
       const uploadedFiles: { name: string, url: string, size: number, type: string, root_hash?: string }[] = []
       let combinedContent = ""
 
-      for (let i = 0; i < form.files.length; i++) {
-        const f = form.files[i]
+      for (let i = 0; i < promptFiles.length; i++) {
+        const f = promptFiles[i]
         const uploadRes = await uploadPromptAsset(f, groupId)
         uploadedFiles.push({
           name: f.name,
@@ -225,6 +393,14 @@ export default function CreatePageContent() {
           } catch (e) {
             console.error("Failed to read file text", e)
           }
+        }
+      }
+
+      if (!combinedContent.trim() && firstTxtFile) {
+        try {
+          combinedContent = await firstTxtFile.text()
+        } catch (e) {
+          console.warn("Failed to read primary .txt content", e)
         }
       }
 
@@ -245,7 +421,7 @@ export default function CreatePageContent() {
       let storageTxHash = ""
       console.log("Uploading to 0G Storage Network via SDK...")
       try {
-        const zgResult = await uploadTo0GStorageNetwork(form.files[0])
+        const zgResult = await uploadTo0GStorageNetwork(firstTxtFile)
         if (zgResult.success && zgResult.rootHash) {
           storageRootHash = zgResult.rootHash
           storageTxHash = zgResult.txHash
@@ -258,6 +434,65 @@ export default function CreatePageContent() {
         }
       } catch (zgErr) {
         console.warn("0G Storage SDK error, continuing without decentralized storage:", zgErr)
+      }
+
+      if (!storageRootHash) {
+        throw new Error("0G Storage upload failed for prompt_txt")
+      }
+
+      const textPackagePayload = {
+        version: 1,
+        title: form.title,
+        prompt_text: form.promptMode === "write" ? form.promptText : combinedContent,
+        negative_prompt: form.negativePrompt,
+        usage_notes: form.usageNotes,
+        commercial_use_allowed: form.commercialUseAllowed,
+        created_at: new Date().toISOString(),
+      }
+      const textPackageFile = new File(
+        [JSON.stringify(textPackagePayload, null, 2)],
+        `${safeTitle}-text-package.json`,
+        { type: "application/json" }
+      )
+      const uploadRequired0G = async (file: File, role: "preview_image" | "text_package") => {
+        const result = await uploadTo0GStorageNetwork(file)
+        if (!result.success || !result.rootHash) {
+          throw new Error(`0G Storage upload failed for ${role}: ${result.error || "missing root hash"}`)
+        }
+        return {
+          role,
+          name: file.name,
+          mime_type: file.type || "application/octet-stream",
+          size: file.size,
+          root_hash: result.rootHash,
+          tx_hash: result.txHash || "",
+        }
+      }
+
+      const promptTxtRef = {
+        role: "prompt_txt",
+        name: firstTxtFile.name,
+        mime_type: firstTxtFile.type || "text/plain",
+        size: firstTxtFile.size,
+        root_hash: storageRootHash,
+        tx_hash: storageTxHash || "",
+      }
+      const previewImageRef = await uploadRequired0G(form.previewImageFile, "preview_image")
+      const textPackageRef = await uploadRequired0G(textPackageFile, "text_package")
+      const zeroGFiles = [promptTxtRef, previewImageRef, textPackageRef]
+      const finalStorageHash = textPackageRef.root_hash || promptTxtRef.root_hash
+      const finalStorageTxHash = textPackageRef.tx_hash || promptTxtRef.tx_hash
+      const storageManifest = {
+        version: 1,
+        title: form.title,
+        description: form.description,
+        creator: address || "",
+        created_at: new Date().toISOString(),
+        pinata_policy: "text_metadata_only",
+        zero_g_files: zeroGFiles,
+        negative_prompt: form.negativePrompt,
+        usage_notes: form.usageNotes,
+        commercial_use_allowed: form.commercialUseAllowed,
       }
 
       const promptUrl = uploadedFiles.length > 0 ? uploadedFiles[0].url : ""
@@ -275,10 +510,22 @@ export default function CreatePageContent() {
           files: uploadedFiles,
           license: form.license,
           royalty: form.royalty,
+          negative_prompt: form.negativePrompt,
+          usage_notes: form.usageNotes,
+          commercial_use_allowed: form.commercialUseAllowed,
           additional_info: form.additionalLinks.filter(l => l.url.trim() !== ""),
           creator_name: profile.name || profile.username || "Anonymous",
           creator_address: address || "",
-          storage_root_hash: storageRootHash,
+          storage_root_hash: finalStorageHash,
+          storage_manifest: storageManifest,
+          pinata_policy: "text_metadata_only",
+          zero_g_files: zeroGFiles,
+          prompt_txt_root_hash: promptTxtRef.root_hash,
+          prompt_txt_tx_hash: promptTxtRef.tx_hash,
+          preview_root_hash: previewImageRef.root_hash,
+          preview_tx_hash: previewImageRef.tx_hash,
+          text_package_root_hash: textPackageRef.root_hash,
+          text_package_tx_hash: textPackageRef.tx_hash,
           reference_images: refImageUrls,
         }
       })
@@ -289,8 +536,6 @@ export default function CreatePageContent() {
       const marketplace = await getMarketplaceContract()
       const royaltyPerMille = Math.max(0, Math.min(200, Math.round(form.royalty * 10)))
       const priceWei = parseEther(String(form.price || "0"))
-      const finalStorageHash = storageRootHash || metadataCID
-
       const tx = await marketplace.listPrompt(
         metadataCID,
         priceWei,
@@ -330,7 +575,7 @@ export default function CreatePageContent() {
       await createPrompt({
         title: form.title,
         description: form.description,
-        price_0g: parseFloat(form.price),
+        price_0g: Number.parseFloat(form.price),
         preview_image_url: finalPreviewUrl,
         watermarked_preview_url: watermarkedPreviewUrl || null,
         cid_ipfs: metadataCID,
@@ -345,19 +590,34 @@ export default function CreatePageContent() {
         contract_id: tokenId ? Number(tokenId) : null,
         currency: form.currency,
         root_hash: finalStorageHash,
+        prompt_txt_root_hash: promptTxtRef.root_hash,
+        prompt_txt_tx_hash: promptTxtRef.tx_hash,
+        preview_root_hash: previewImageRef.root_hash,
+        preview_tx_hash: previewImageRef.tx_hash,
+        text_package_root_hash: textPackageRef.root_hash,
+        text_package_tx_hash: textPackageRef.tx_hash,
+        ipfs_metadata_uri: metadataCID,
+        storage_manifest: storageManifest,
+        storage_status: "uploaded",
         reference_images: refImageUrls,
+        negative_prompt: form.negativePrompt.trim() || null,
+        usage_notes: form.usageNotes.trim() || null,
+        commercial_use_allowed: form.commercialUseAllowed,
         additional_info: {
           links: form.additionalLinks.filter(l => l.url.trim() !== ""),
           files: uploadedFiles,
           storage_root_hash: finalStorageHash,
+          storage_manifest: storageManifest,
         },
         original_content: combinedContent
       })
       setDeployedTxId(tx.hash)
       setDeployedMetadataCID(metadataCID)
-      setDeployedStorageHash(storageRootHash || null)
-      setDeployedStorageTxHash(storageTxHash || null)
+      setDeployedStorageHash(finalStorageHash || null)
+      setDeployedStorageTxHash(finalStorageTxHash || null)
       setDeployed(true)
+      globalThis.localStorage.removeItem(DRAFT_KEY)
+      setDraftSavedAt(null)
 
     } catch (error) {
       console.error("Failed to deploy prompt:", error)
@@ -371,28 +631,40 @@ export default function CreatePageContent() {
   const platformFeeUsd = platformFee * ogPrice
   const totalEarnings = Number(form.price) - platformFee
   const totalEarningsUsd = totalEarnings * ogPrice
+  const hasPromptContent = form.promptMode === "write" ? form.promptText.trim().length > 0 : form.files.length > 0
+  const previewImageSrc = previewUrl || form.previewImageUrl
+  const checklist = [
+    { label: "Title added", done: form.title.trim().length > 0 },
+    { label: "Prompt included", done: hasPromptContent },
+    { label: `Preview images (${form.referenceImages.length}/${MAX_REFERENCE_IMAGES})`, done: form.referenceImages.length > 0 },
+    { label: form.promptMode === "write" ? "Written prompt ready" : `Files attached (${form.files.length}/10)`, done: hasPromptContent },
+  ]
+  const readyToPublish = checklist.every((item) => item.done) && Number(form.price) >= 0 && (
+    form.previewMode === "url" ? form.previewImageUrl.length > 0 : form.previewImageFile !== null
+  )
 
   const canProceed = [
     form.title.length > 0 &&
     form.description.length > 0 &&
     (form.previewMode === "url" ? form.previewImageUrl.length > 0 : form.previewImageFile !== null),
     Number(form.price) >= 0,
-    form.files.length > 0,
+    hasPromptContent,
     true,
   ]
 
   return (
+    <>
     <AppShell>
-      <div className="mx-auto max-w-4xl px-4 py-10 lg:px-8">
+      <div className="mx-auto max-w-[1400px] px-4 py-10 lg:px-12">
         <p className="text-sm font-bold text-[#b4ff39] uppercase tracking-widest mb-2 font-mono">{"// CREATE"}</p>
         <h1 className="text-3xl font-extrabold text-[#e0d4ff] mb-2">
           Create <span className="gradient-text">Prompt</span>
         </h1>
         <p className="text-[#a78bfa] mb-8">List your AI prompt on the marketplace.</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3">
-            <StepIndicator current={step} />
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
+          <div className="xl:col-span-8">
+            <StepIndicator current={step} onStepClick={!deploying && !deployed ? setStep : undefined} />
 
             {deployed ? (
               <div className="bg-[#16161a]/60 backdrop-blur-xl border-2 border-[#2a2a30] p-10 text-center">
@@ -802,77 +1074,180 @@ export default function CreatePageContent() {
                 {/* Step 2: Upload */}
                 {step === 2 && (
                   <div className="flex flex-col gap-6">
-                    <div
-                      className={`backdrop-blur-md bg-[#160f24]/60 border-2 border-dashed p-12 text-center cursor-pointer transition-all ${form.files.length > 0 ? "border-[#b4ff39] bg-[#b4ff39]/10 shadow-[8px_8px_0_0_#b4ff39]" : "border-[#2a2a30] hover:border-[#00ffff] hover:shadow-[4px_4px_0_0_#00ffff]"
-                        }`}
-                      onClick={() => document.getElementById("prompt-upload")?.click()}
-                      role="button"
-                      tabIndex={0}
-                      aria-label="Upload file area"
-                      onKeyDown={(e) => e.key === "Enter" && document.getElementById("prompt-upload")?.click()}
-                    >
-                      <input
-                        id="prompt-upload"
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          const newFiles = Array.from(e.target.files || [])
-                          if (newFiles.length > 0) update("files", [...form.files, ...newFiles])
-                        }}
-                      />
-                      <div>
-                        <div className="w-14 h-14 mx-auto mb-3 rounded-xl glass flex items-center justify-center">
-                          <Upload className="w-7 h-7 text-[#ff2d95]" />
+                    <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
+                        <div>
+                          <h3 className="text-sm font-bold text-[#e0d4ff] flex items-center gap-2">
+                            <Wand2 className="w-4 h-4 text-[#00ffff]" />
+                            Prompt Content
+                          </h3>
+                          <p className="text-[11px] text-[#a78bfa]/60 mt-1">Write directly or upload a complete prompt package.</p>
                         </div>
-                        <p className="text-sm font-bold text-[#e0d4ff]">Click to upload your prompt files</p>
-                        <p className="text-xs text-[#a78bfa]/50 mt-1 font-mono">Supports TXT, JSON, MD, CODE (Max 10MB per file)</p>
+                        <div className="flex bg-[#0a001a] border border-[#2a2a30] p-0.5 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => update("promptMode", "upload")}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${form.promptMode === "upload" ? "bg-[#00ffff] text-black" : "text-[#a78bfa] hover:text-[#e0d4ff]"}`}
+                          >
+                            Upload File
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => update("promptMode", "write")}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${form.promptMode === "write" ? "bg-[#b4ff39] text-black" : "text-[#a78bfa] hover:text-[#e0d4ff]"}`}
+                          >
+                            Write Prompt
+                          </button>
+                        </div>
+                      </div>
+
+                      {form.promptMode === "write" ? (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-[11px] font-bold text-[#a78bfa] uppercase tracking-wider">Editor View</label>
+                                <div className="flex items-center gap-4">
+                                    {PROMPT_VARIABLES.map((variable) => (
+                                      <button
+                                        key={variable}
+                                        type="button"
+                                        onClick={() => insertVariable(variable)}
+                                        className="px-2 py-0.5 border border-[#00ffff]/30 bg-[#00ffff]/5 text-[9px] font-bold text-[#00ffff] hover:bg-[#00ffff]/20 transition-colors rounded"
+                                      >
+                                        +{variable}
+                                      </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-[44px_1fr] bg-[#0a001a] border-2 border-[#2a2a30] focus-within:border-[#00ffff] transition-colors min-h-[300px] rounded-lg overflow-hidden shadow-inner">
+                              <div className="py-3 text-right pr-3 border-r border-[#2a2a30] text-[11px] leading-6 font-mono text-[#a78bfa]/30 select-none bg-black/40">
+                                {Array.from({ length: Math.max(10, form.promptText.split("\n").length) }).map((_, idx) => (
+                                  <div key={idx}>{idx + 1}</div>
+                                ))}
+                              </div>
+                              <textarea
+                                ref={promptTextareaRef}
+                                value={form.promptText}
+                                maxLength={1000}
+                                onChange={(e) => update("promptText", e.target.value)}
+                                placeholder="/imagine prompt: {subject}, cinematic lighting, detailed composition, 8k resolution, photorealistic..."
+                                className="min-h-[300px] resize-none bg-transparent px-5 py-3 text-sm leading-6 text-[#e0d4ff] placeholder-[#a78bfa]/20 focus:outline-none font-mono"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] font-mono mt-1">
+                              <div className="flex items-center gap-2 text-[#a78bfa]/40">
+                                <FileCode className="w-3 h-3" />
+                                <span>Markdown/JSON supported</span>
+                              </div>
+                              <span className={form.promptText.length > 900 ? "text-[#ff2d95]" : "text-[#a78bfa]/50"}>{form.promptText.length}/1000</span>
+                            </div>
+                          </div>
+                      ) : (
+                        <>
+                          <div
+                            className={`backdrop-blur-md bg-[#160f24]/60 border-2 border-dashed p-12 text-center cursor-pointer transition-all ${form.files.length > 0 ? "border-[#b4ff39] bg-[#b4ff39]/10 shadow-[8px_8px_0_0_#b4ff39]" : "border-[#2a2a30] hover:border-[#00ffff] hover:shadow-[4px_4px_0_0_#00ffff]"
+                              }`}
+                            onClick={() => document.getElementById("prompt-upload")?.click()}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Upload file area"
+                            onKeyDown={(e) => e.key === "Enter" && document.getElementById("prompt-upload")?.click()}
+                          >
+                            <input
+                              id="prompt-upload"
+                              type="file"
+                              multiple
+                              accept=".txt,.json,.md,.code,.pdf,.zip,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp,application/pdf,application/zip"
+                              className="hidden"
+                              onChange={(e) => {
+                                const newFiles = Array.from(e.target.files || [])
+                                if (newFiles.length > 0) addPromptFiles(newFiles)
+                                e.target.value = ""
+                              }}
+                            />
+                            <div>
+                              <div className="w-14 h-14 mx-auto mb-3 rounded-xl glass flex items-center justify-center">
+                                <Upload className="w-7 h-7 text-[#ff2d95]" />
+                              </div>
+                              <p className="text-sm font-bold text-[#e0d4ff]">Click to upload your prompt files</p>
+                              <p className="text-xs text-[#a78bfa]/50 mt-1 font-mono">TXT, JSON, MD, CODE, PDF, ZIP, PNG, JPG, WEBP (Max 50MB per file)</p>
+                            </div>
+                          </div>
+
+                          {form.files.length > 0 && (
+                            <div className="flex flex-col gap-3 mt-4">
+                              <h4 className="text-xs font-bold text-[#b4ff39] uppercase tracking-widest">Uploaded Files ({form.files.length}/10)</h4>
+                              <div className="flex flex-col gap-2">
+                                {form.files.map((f, idx) => (
+                                  <div key={`${f.name}-${idx}`} className="bg-[#160f24]/80 border border-[#2a2a30] p-3 flex items-center justify-between group">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      {fileIcon(f)}
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-bold text-[#e0d4ff] truncate">{f.name}</p>
+                                        <p className="text-[10px] text-[#a78bfa]/60 font-mono">{formatSize(f.size)}</p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); update("files", form.files.filter((_, i) => i !== idx)); }}
+                                      className="p-1 hover:bg-[#ff2d95]/10 rounded transition-colors"
+                                    >
+                                      <X className="w-4 h-4 text-[#ff2d95]" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-bold text-[#e0d4ff]">Negative Prompt</label>
+                          <span className={form.negativePrompt.length > 900 ? "text-[10px] text-[#ff2d95] font-mono" : "text-[10px] text-[#a78bfa]/50 font-mono"}>{form.negativePrompt.length}/1000</span>
+                        </div>
+                        <textarea
+                          value={form.negativePrompt}
+                          maxLength={1000}
+                          rows={5}
+                          onChange={(e) => update("negativePrompt", e.target.value)}
+                          placeholder="blurry, low quality, deformed, bad anatomy, overexposed..."
+                          className="w-full bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] placeholder-[#a78bfa]/30 focus:outline-none focus:border-[#00ffff] font-medium transition-colors resize-y"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-bold text-[#e0d4ff]">Usage Notes</label>
+                          <span className={form.usageNotes.length > 900 ? "text-[10px] text-[#ff2d95] font-mono" : "text-[10px] text-[#a78bfa]/50 font-mono"}>{form.usageNotes.length}/1000</span>
+                        </div>
+                        <textarea
+                          value={form.usageNotes}
+                          maxLength={1000}
+                          rows={5}
+                          onChange={(e) => update("usageNotes", e.target.value)}
+                          placeholder="Best results with clear subject references and high-quality input images."
+                          className="w-full bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] px-4 py-3 text-sm text-[#e0d4ff] placeholder-[#a78bfa]/30 focus:outline-none focus:border-[#00ffff] font-medium transition-colors resize-y"
+                        />
                       </div>
                     </div>
 
-                    {form.files.length > 0 && (
-                      <div className="flex flex-col gap-3">
-                        <h4 className="text-xs font-bold text-[#b4ff39] uppercase tracking-widest">Uploaded Files ({form.files.length})</h4>
-                        <div className="flex flex-col gap-2">
-                          {form.files.map((f, idx) => (
-                            <div key={idx} className="bg-[#160f24]/80 border border-[#2a2a30] p-3 flex items-center justify-between group">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <FileText className="w-4 h-4 text-[#a78bfa] shrink-0" />
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold text-[#e0d4ff] truncate">{f.name}</p>
-                                  <p className="text-[10px] text-[#a78bfa]/60 font-mono">{(f.size / 1024).toFixed(1)} KB</p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); update("files", form.files.filter((_, i) => i !== idx)); }}
-                                className="p-1 hover:bg-[#ff2d95]/10 rounded transition-colors"
-                              >
-                                <X className="w-4 h-4 text-[#ff2d95]" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                    <label className="flex items-center gap-3 cursor-pointer bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] hover:border-[#b4ff39] px-4 py-3 text-sm text-[#a78bfa] hover:text-[#e0d4ff] transition-all font-semibold select-none">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={form.commercialUseAllowed}
+                        onChange={(e) => update("commercialUseAllowed", e.target.checked)}
+                      />
+                      <div className={`w-5 h-5 shrink-0 border-2 flex items-center justify-center transition-colors ${form.commercialUseAllowed ? "bg-[#b4ff39] border-[#b4ff39]" : "border-[#a78bfa]"}`}>
+                        {form.commercialUseAllowed && <Check className="w-3 h-3 text-black" />}
                       </div>
-                    )}
-
-                    {form.files.length > 0 && (
-                      <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-4 animate-in fade-in slide-in-from-top-2 duration-500">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-[#a78bfa] font-mono">Encryption</span>
-                          <span className="text-xs text-[#b4ff39] flex items-center gap-1 font-bold">
-                            <Check className="w-3 h-3" />
-                            Encrypted
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-[#a78bfa] font-mono">IPFS Upload</span>
-                          <span className="text-xs text-[#b4ff39] flex items-center gap-1 font-bold">
-                            <Check className="w-3 h-3" />
-                            Ready
-                          </span>
-                        </div>
+                      <div className="flex flex-col">
+                        <span className="text-[#e0d4ff] font-bold">Commercial use allowed</span>
+                        <span className="text-xs text-[#a78bfa]/60 font-medium font-mono tracking-tighter">Controls whether buyer outputs may be used commercially.</span>
                       </div>
-                    )}
+                    </label>
 
                     {/* Reference Images Section */}
                     <div className="mt-4">
@@ -880,14 +1255,15 @@ export default function CreatePageContent() {
                         <ImagePlus className="w-4 h-4" />
                         Reference Images (Optional)
                       </h4>
-                      <p className="text-xs text-[#a78bfa]/50 mb-3">Add up to 4 reference images to show buyers what your prompt can generate.</p>
+                      <p className="text-xs text-[#a78bfa]/50 mb-3">Add up to {MAX_REFERENCE_IMAGES} reference images to show buyers what your prompt can generate.</p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {form.referenceImages.map((f, idx) => (
                           <div key={idx} className="relative aspect-square bg-[#160f24]/80 border border-[#2a2a30] overflow-hidden group">
                             <img
                               src={URL.createObjectURL(f)}
                               alt={`Reference ${idx + 1}`}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover cursor-zoom-in"
+                              onClick={() => setPreviewImage(URL.createObjectURL(f))}
                             />
                             <button
                               onClick={() => update("referenceImages", form.referenceImages.filter((_, i) => i !== idx))}
@@ -897,7 +1273,7 @@ export default function CreatePageContent() {
                             </button>
                           </div>
                         ))}
-                        {form.referenceImages.length < 4 && (
+                        {form.referenceImages.length < MAX_REFERENCE_IMAGES && (
                           <label className="aspect-square bg-[#160f24]/60 border-2 border-dashed border-[#2a2a30] hover:border-[#00ffff] flex flex-col items-center justify-center cursor-pointer transition-all">
                             <ImagePlus className="w-6 h-6 text-[#a78bfa]/40 mb-1" />
                             <span className="text-[10px] text-[#a78bfa]/40">Add Image</span>
@@ -907,7 +1283,7 @@ export default function CreatePageContent() {
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0]
-                                if (file) update("referenceImages", [...form.referenceImages, file])
+                                if (file && form.referenceImages.length < MAX_REFERENCE_IMAGES) update("referenceImages", [...form.referenceImages, file])
                                 e.target.value = ""
                               }}
                             />
@@ -936,11 +1312,11 @@ export default function CreatePageContent() {
                               const result = await checkPlagiarism({
                                 title: form.title,
                                 description: form.description,
-                                content: form.files.length > 0 ? form.files[0].name : undefined,
+                                content: form.promptMode === "write" ? form.promptText : (form.files.length > 0 ? form.files[0].name : undefined),
                               })
                               setPlagiarismResult(result)
-                            } catch {
-                              setPlagiarismResult({ is_plagiarized: false, similarity_score: 0, reasoning: "Check unavailable — proceed with caution.", similar_prompts: [] })
+                            } catch (err: any) {
+                              setPlagiarismResult({ is_plagiarized: false, similarity_score: 0, reasoning: `Check unavailable (${err.message || "Unknown error"}) — proceed with caution.`, similar_prompts: [] })
                             } finally {
                               setPlagiarismChecking(false)
                             }
@@ -999,6 +1375,44 @@ export default function CreatePageContent() {
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-5">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <h3 className="text-sm font-bold text-[#e0d4ff]">Quality Score</h3>
+                        <button
+                          type="button"
+                          onClick={handlePreviewScore}
+                          disabled={qualityScoring}
+                          className="px-3 py-1.5 text-xs font-bold bg-[#b4ff39]/10 border border-[#b4ff39]/30 text-[#b4ff39] hover:bg-[#b4ff39]/20 transition-colors disabled:opacity-50"
+                        >
+                          {qualityScoring ? (
+                            <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Scoring...</span>
+                          ) : "Run Score"}
+                        </button>
+                      </div>
+                      {qualityScore ? (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#a78bfa]/70 uppercase">Overall</span>
+                            <span className="text-lg font-extrabold text-[#b4ff39]">{qualityScore.overall}/10</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px] text-[#a78bfa]/70">
+                            {["clarity", "completeness", "safety", "reproducibility", "innovation"].map((key) => (
+                              <div key={key} className="flex items-center justify-between gap-2 border border-[#2a2a30] px-2 py-1">
+                                <span className="capitalize">{key}</span>
+                                <span className="font-mono text-[#e0d4ff]">{qualityScore[key] ?? 0}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-[#a78bfa]/50 leading-relaxed">{qualityScore.reasoning}</p>
+                          <p className="text-[9px] text-[#00ffff]/70 uppercase tracking-widest">
+                            {qualityScore.source === "heuristic" ? "Heuristic fallback" : "0G Compute"}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#a78bfa]/40">Run quality scoring before deploy to preview prompt readiness.</p>
+                      )}
                     </div>
 
                     <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-5">
@@ -1092,37 +1506,165 @@ export default function CreatePageContent() {
             )}
           </div>
 
-          {/* Sidebar tips */}
-          <div className="hidden lg:block">
-            <div className="sticky top-24 bg-[#16161a]/60 backdrop-blur-xl border-2 border-[#2a2a30] p-5 hover-neo-orange">
-              <div className="flex items-center gap-2 mb-4">
-                <Lightbulb className="w-4 h-4 text-[#ff6b2b]" />
-                <h3 className="text-sm font-bold text-[#e0d4ff]">Tips</h3>
+          {/* Sidebar preview */}
+          <div className="hidden xl:block xl:col-span-4">
+            <div className="sticky top-24 flex flex-col gap-4">
+              <div className="bg-[#16161a]/60 backdrop-blur-xl border-2 border-[#2a2a30] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-[#00ffff]" />
+                    <h3 className="text-sm font-bold text-[#e0d4ff]">Live Preview</h3>
+                  </div>
+                  <span className={`px-2 py-1 text-[9px] font-black uppercase border ${readyToPublish ? "border-[#b4ff39] bg-[#b4ff39]/10 text-[#b4ff39]" : "border-[#a78bfa]/30 text-[#a78bfa]/60"}`}>
+                    {readyToPublish ? "Ready" : "Draft"}
+                  </span>
+                </div>
+                <div 
+                  className={`border-2 border-[#2a2a30] bg-[#0a001a] overflow-hidden rounded-xl shadow-2xl ${previewImageSrc ? "cursor-zoom-in" : ""}`}
+                  onClick={() => previewImageSrc && setPreviewImage(previewImageSrc)}
+                >
+                  <div className="aspect-[4/3] bg-[#160f24] relative">
+                    {previewImageSrc ? (
+                      <img src={previewImageSrc} alt="Listing preview" className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2">
+                            <ImagePlus className="w-10 h-10 text-[#a78bfa]/20 animate-pulse" />
+                            <span className="text-[10px] text-[#a78bfa]/40 font-bold uppercase tracking-widest">Image Preview</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute top-2 left-2 flex gap-1">
+                        <span className="px-2 py-0.5 bg-black/60 backdrop-blur-md border border-white/10 text-[9px] font-bold text-white uppercase rounded">
+                            {form.category || "Category"}
+                        </span>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-sm font-black text-[#e0d4ff] leading-tight line-clamp-2">{form.title || "Your Prompt Title"}</p>
+                        <div className="flex items-center gap-1 bg-[#00ffff]/10 px-1.5 py-0.5 rounded border border-[#00ffff]/20">
+                            <Zap className="w-2.5 h-2.5 text-[#00ffff] fill-[#00ffff]" />
+                            <span className="text-[9px] font-bold text-[#00ffff]">NEW</span>
+                        </div>
+                    </div>
+                    <p className="text-[11px] text-[#a78bfa]/50 line-clamp-2 mb-4 leading-relaxed italic">{form.description || "Describe your prompt's magic here..."}</p>
+                    
+                    <div className="flex flex-wrap gap-1 mb-4">
+                        {form.tags.length > 0 ? form.tags.slice(0, 3).map(t => (
+                            <span key={t} className="text-[8px] font-bold text-[#a78bfa]/40 bg-[#2a2a30]/50 px-1.5 py-0.5 border border-[#2a2a30]">#{t.toUpperCase()}</span>
+                        )) : (
+                            <span className="text-[8px] font-bold text-[#a78bfa]/20 bg-[#2a2a30]/30 px-1.5 py-0.5 border border-[#2a2a30]">#TAGS</span>
+                        )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-[#2a2a30] gap-4">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-5 h-5 shrink-0 rounded-full bg-gradient-to-br from-[#00ffff] to-[#a855f7] flex items-center justify-center text-[8px] font-black text-black">
+                            {isConnected && address ? address.slice(2, 4).toUpperCase() : "AI"}
+                        </div>
+                        <span className="text-[10px] font-bold text-[#e0d4ff]/60 truncate">{form.model || "Select Model"}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-black text-[#b4ff39] whitespace-nowrap">
+                            {form.price && Number(form.price) > 0 ? `${form.price} ${form.currency}` : `0 ${form.currency}`}
+                        </p>
+                        <p className="text-[9px] text-[#a78bfa]/40 font-mono whitespace-nowrap">
+                            ~${(Number(form.price || 0) * ogPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <ul className="flex flex-col gap-3 text-xs text-[#a78bfa] leading-relaxed">
-                <li className="flex gap-2">
-                  <span className="text-[#ff2d95] font-extrabold shrink-0">01</span>
-                  Write a clear, descriptive title that highlights the unique value of your prompt.
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-[#00ffff] font-extrabold shrink-0">02</span>
-                  Set competitive pricing by researching similar prompts in the marketplace.
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-[#b4ff39] font-extrabold shrink-0">03</span>
-                  Add relevant tags to help buyers discover your prompt.
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-[#a855f7] font-extrabold shrink-0">04</span>
-                  Exclusive licenses command premium prices but limit to one buyer.
-                </li>
-              </ul>
-              {/* Pixel accent */}
-              <div className="mt-4 h-1 w-16 y2k-pixel-border" aria-hidden="true" />
+
+              <div className="bg-[#16161a]/60 backdrop-blur-xl border-2 border-[#2a2a30] p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <ListChecks className="w-4 h-4 text-[#b4ff39]" />
+                  <h3 className="text-sm font-bold text-[#e0d4ff]">Checklist</h3>
+                </div>
+                <ul className="flex flex-col gap-3 text-xs">
+                  {checklist.map((item) => (
+                    <li key={item.label} className="flex items-center gap-2 text-[#a78bfa]">
+                      <span className={`w-4 h-4 border flex items-center justify-center shrink-0 ${item.done ? "bg-[#b4ff39] border-[#b4ff39]" : "border-[#a78bfa]/30"}`}>
+                        {item.done && <Check className="w-3 h-3 text-black" />}
+                      </span>
+                      {item.label}
+                    </li>
+                  ))}
+                  <li className="flex items-center gap-2">
+                    <span className="w-4 h-4 border border-[#a78bfa]/30 shrink-0" />
+                    <a href="/guidelines" className="text-[#00ffff] hover:text-[#b4ff39] transition-colors">Review guidelines</a>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-[#16161a]/60 backdrop-blur-xl border-2 border-[#b4ff39]/20 p-5 rounded-xl group hover:border-[#b4ff39]/50 transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-[10px] text-[#a78bfa]/60 font-mono uppercase tracking-widest flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" />
+                        You receive
+                    </p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                        <p className="text-3xl font-black text-[#b4ff39]">{totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })}</p>
+                        <span className="text-sm font-bold text-[#b4ff39]/60">{form.currency}</span>
+                    </div>
+                    <p className="text-[11px] text-[#a78bfa]/50 mt-1 leading-tight">
+                        After <span className="text-[#e0d4ff] font-bold">{(feePercentage * 100).toFixed(1)}%</span> fee, approx <span className="text-[#b4ff39] font-bold">${(totalEarningsUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>.
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-[#b4ff39]/10 rounded-full flex items-center justify-center border border-[#b4ff39]/20 group-hover:rotate-12 transition-transform">
+                    <Zap className="w-6 h-6 text-[#b4ff39]" />
+                  </div>
+                </div>
+              </div>
+
+              {draftSavedAt && (
+                <div className="bg-[#b4ff39]/10 border border-[#b4ff39]/30 p-3 flex items-center gap-2 text-xs font-bold text-[#b4ff39]">
+                  <Save className="w-4 h-4" />
+                  Draft autosaved at {draftSavedAt}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
     </AppShell>
+
+    {/* Full Screen Image Preview Modal */}
+    {previewImage && (
+      <div 
+        className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 md:p-10 animate-in fade-in zoom-in duration-300"
+        onClick={() => setPreviewImage(null)}
+      >
+        <button 
+          className="fixed top-6 right-6 p-2.5 bg-[#ff2d95] hover:bg-[#ff2d95]/80 rounded-full text-white transition-all shadow-[0_0_20px_rgba(255,45,149,0.4)] z-[100000] group border border-white/20"
+          title="Close Preview"
+          onClick={(e) => {
+            e.stopPropagation()
+            setPreviewImage(null)
+          }}
+        >
+          <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+        </button>
+        
+        <div 
+          className="relative max-w-[95vw] max-h-[90vh] flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <img 
+            src={previewImage} 
+            alt="Preview" 
+            className="max-w-full max-h-[90vh] object-contain border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg" 
+          />
+          <div className="absolute -bottom-8 left-0 right-0 text-center">
+            <p className="text-white/40 text-[10px] font-mono uppercase tracking-[0.2em]">Click anywhere to close</p>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

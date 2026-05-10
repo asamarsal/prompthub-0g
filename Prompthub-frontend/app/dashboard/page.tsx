@@ -13,7 +13,7 @@ import {
   AreaChart,
 } from "recharts"
 import { useState, useEffect } from "react"
-import { getDashboardData } from "@/lib/api"
+import { getDashboardData, uploadMetadata, syncAgentStatus, fetchMe } from "@/lib/api"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 import { useWallet } from "@/lib/wallet-context"
 import { cn } from "@/lib/utils"
@@ -44,8 +44,10 @@ export default function DashboardPage() {
   const [agentRegistered, setAgentRegistered] = useState<boolean | null>(null)
   const [reputation, setReputation] = useState<AgentReputation | null>(null)
   const [agentRegLoading, setAgentRegLoading] = useState(false)
+  const [profile, setProfile] = useState<any>(null)
 
   useEffect(() => {
+    fetchMe().then(setProfile).catch(() => null)
     if (walletAddress) {
       checkAgentRegistered(walletAddress).then(registered => {
         setAgentRegistered(registered)
@@ -57,14 +59,31 @@ export default function DashboardPage() {
   }, [walletAddress])
 
   const handleRegisterAgent = async () => {
-    const metadataUri = window.prompt("Enter your agent metadata URI (IPFS or URL):")
-    if (!metadataUri || !metadataUri.trim()) return
+    if (!walletAddress) {
+      toast.error("Connect wallet first")
+      return
+    }
     setAgentRegLoading(true)
     try {
+      const metadata = await uploadMetadata({
+        name: profile?.name || profile?.username || `PromptHub Agent ${walletAddress.slice(0, 8)}`,
+        description: profile?.bio || "PromptHub AI creator identity and reputation metadata.",
+        image: profile?.avatar_url || "",
+        properties: {
+          wallet_address: walletAddress,
+          username: profile?.username || null,
+          roles: profile?.roles || ["artist"],
+          skills: profile?.skills || [],
+          generated_at: new Date().toISOString(),
+          schema: "prompthub-agent-id-v1",
+        },
+      })
+      const metadataUri = metadata.ipfs_uri
       const registry = await getAgentRegistryContract()
-      const tx = await registry.registerAgent(metadataUri.trim())
+      const tx = await registry.registerAgent(metadataUri)
       await tx.wait()
       setAgentRegistered(true)
+      await syncAgentStatus().catch(() => null)
       toast.success("Successfully registered as AI Agent!")
     } catch (e: any) {
       console.error(e)

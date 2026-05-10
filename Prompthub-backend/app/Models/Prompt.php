@@ -28,13 +28,28 @@ class Prompt extends Model
         'is_curated',
         'total_sold',
         'original_content',
+        'negative_prompt',
+        'usage_notes',
+        'view_count',
         'contract_id',
         'og_tx_id',
         'root_hash',
+        'storage_manifest',
+        'prompt_txt_root_hash',
+        'prompt_txt_tx_hash',
+        'preview_root_hash',
+        'preview_tx_hash',
+        'text_package_root_hash',
+        'text_package_tx_hash',
+        'ipfs_metadata_uri',
+        'storage_status',
+        'ai_quality_score',
+        'ai_quality_score_updated_at',
         'currency',
         'additional_info',
         'reference_images',
-        'watermarked_preview_url'
+        'watermarked_preview_url',
+        'commercial_use_allowed'
     ];
 
     protected $casts = [
@@ -45,9 +60,14 @@ class Prompt extends Model
         'is_curated' => 'boolean',
         'royalty_percentage' => 'integer',
         'total_sold' => 'integer',
+        'view_count' => 'integer',
         'contract_id' => 'integer',
+        'storage_manifest' => 'array',
+        'ai_quality_score' => 'array',
+        'ai_quality_score_updated_at' => 'datetime',
         'additional_info' => 'array',
-        'reference_images' => 'array'
+        'reference_images' => 'array',
+        'commercial_use_allowed' => 'boolean'
     ];
 
     protected $appends = ['average_rating'];

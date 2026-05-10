@@ -39,6 +39,7 @@ Route::get('/artists/{id}/reviews', [ArtistReviewController::class, 'index']);
 Route::get('/prompts/{id}/reviews', [ReviewController::class, 'index']);
 Route::get('/prompts/{id}/transactions', [TransactionController::class, 'promptHistory']);
 Route::get('/prompts/{id}/similar', [PromptRecommendationController::class, 'similar']);
+Route::post('/prompts/check-plagiarism', [PlagiarismController::class, 'check']);
 
 // Protected routes (requires Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
@@ -51,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/search', [UserController::class, 'search']);
     Route::get('/users/me', [AuthController::class, 'me']);
     Route::put('/users/me', [AuthController::class, 'update']);
+    Route::post('/users/me/sync-agent', [UserController::class, 'syncAgentStatus']);
     Route::post('/users/upload', [\App\Http\Controllers\FileController::class, 'uploadToIpfs']);
     Route::post('/ipfs/metadata', [\App\Http\Controllers\FileController::class, 'uploadMetadata']);
     Route::post('/prompts/upload-assets', [\App\Http\Controllers\FileController::class, 'uploadPromptAsset']);
@@ -77,8 +79,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/prompts/{id}/relist', [PromptController::class, 'relist']);
     Route::put('/prompts/{id}/price', [PromptController::class, 'updatePrice']);
     Route::get('/prompts/{id}/content', [PromptController::class, 'getContent'])->middleware('x402');
+    Route::get('/prompts/{id}/storage-refs', [PromptController::class, 'storageRefs'])->middleware('x402');
     Route::post('/prompts/{id}/score', [PromptScoreController::class, 'score']);
-    Route::post('/prompts/check-plagiarism', [PlagiarismController::class, 'check']);
+    Route::post('/prompts/preview-score', [PromptScoreController::class, 'preview']);
 
     // Contests
     Route::post('/contests', [ContestController::class, 'store']);
@@ -90,6 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/hire/my-requests', [HireRequestController::class, 'index']);
     Route::post('/hire', [HireRequestController::class, 'store']);
     Route::post('/hire/{id}/verify-escrow', [HireRequestController::class, 'verifyEscrow']);
+    Route::post('/hire/{id}/verify-completion', [HireRequestController::class, 'verifyCompletion']);
     Route::put('/hire/{id}/status', [HireRequestController::class, 'updateStatus']);
 
     // Messages

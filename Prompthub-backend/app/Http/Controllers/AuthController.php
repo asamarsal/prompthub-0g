@@ -128,6 +128,14 @@ class AuthController extends Controller
             'reviews' => $user->reviews_count,
             'sold' => (int)($user->sold_count ?? 0),
         ];
+        $userData['agent_registered'] = (bool) $user->agent_registered;
+        $userData['agent_verified'] = (bool) $user->agent_verified;
+        $userData['agent_metadata_uri'] = $user->agent_metadata_uri;
+        $userData['agent_reputation'] = [
+            'avg_rating' => (int) $user->agent_avg_rating,
+            'completed_jobs' => (int) $user->agent_completed_jobs,
+            'total_reviews' => (int) $user->agent_total_reviews,
+        ];
         $userData['activities'] = $activities;
 
         return $userData;

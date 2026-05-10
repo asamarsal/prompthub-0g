@@ -28,6 +28,13 @@ class User extends Authenticatable
         'hourly_rate_currency',
         'skills',
         'specialization_id',
+        'agent_registered',
+        'agent_verified',
+        'agent_metadata_uri',
+        'agent_avg_rating',
+        'agent_completed_jobs',
+        'agent_total_reviews',
+        'agent_synced_at',
     ];
 
     protected function casts(): array
@@ -38,6 +45,12 @@ class User extends Authenticatable
             'hourly_rate' => 'decimal:4',
             'skills' => 'array',
             'specialization_id' => 'array',
+            'agent_registered' => 'boolean',
+            'agent_verified' => 'boolean',
+            'agent_avg_rating' => 'integer',
+            'agent_completed_jobs' => 'integer',
+            'agent_total_reviews' => 'integer',
+            'agent_synced_at' => 'datetime',
         ];
     }
 

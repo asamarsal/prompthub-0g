@@ -29,6 +29,8 @@ import {
 import { useWallet } from "@/lib/wallet-context"
 import { cn } from "@/lib/utils"
 import {
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   FileText,
   KeyRound,
@@ -132,6 +134,7 @@ export default function AdminPage() {
   const [taxonomySaving, setTaxonomySaving] = useState(false)
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null)
   const [editingModelId, setEditingModelId] = useState<number | null>(null)
+  const [taxonomyCollapsed, setTaxonomyCollapsed] = useState(false)
   const [categoryForm, setCategoryForm] = useState<CategoryForm>({
     name: "",
     slug: "",
@@ -688,24 +691,39 @@ export default function AdminPage() {
 
         <div className="mb-6 border border-[#2a2a30] bg-[#16161a]/60 p-5">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-[#00ffff]">Marketplace Taxonomy</p>
-              <p className="mt-1 text-sm text-[#a78bfa]">
-                Manage the category and AI model options used by marketplace filters and prompt creation.
-              </p>
-            </div>
-            <Button
-              type="button"
-              onClick={loadTaxonomy}
-              disabled={taxonomyLoading}
-              className="rounded-none border-2 border-[#2a2a30] bg-[#0f0f13] text-white hover:border-[#00ffff] hover:bg-[#0f0f13]"
+            <div
+              className="cursor-pointer group flex-1"
+              onClick={() => setTaxonomyCollapsed(!taxonomyCollapsed)}
             >
-              <RefreshCw className={cn("h-4 w-4", taxonomyLoading && "animate-spin")} />
-              Sync
-            </Button>
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00ffff] group-hover:text-[#b4ff39] transition-colors">
+                Marketplace Taxonomy
+                {taxonomyCollapsed ? (
+                  <ChevronDown className="h-4 w-4 text-[#a78bfa] group-hover:text-[#b4ff39]" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-[#a78bfa] group-hover:text-[#b4ff39]" />
+                )}
+              </p>
+              {!taxonomyCollapsed && (
+                <p className="mt-1 text-sm text-[#a78bfa]">
+                  Manage the category and AI model options used by marketplace filters and prompt creation.
+                </p>
+              )}
+            </div>
+            {!taxonomyCollapsed && (
+              <Button
+                type="button"
+                onClick={loadTaxonomy}
+                disabled={taxonomyLoading}
+                className="rounded-none border-2 border-[#2a2a30] bg-[#0f0f13] text-white hover:border-[#00ffff] hover:bg-[#0f0f13]"
+              >
+                <RefreshCw className={cn("h-4 w-4", taxonomyLoading && "animate-spin")} />
+                Sync
+              </Button>
+            )}
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          {!taxonomyCollapsed && (
+            <div className="grid gap-5 lg:grid-cols-2">
             <section className="border border-[#2a2a30] bg-[#0f0f13] p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="font-display text-lg font-black uppercase tracking-wider text-[#e0d4ff]">Categories</h2>
@@ -929,6 +947,7 @@ export default function AdminPage() {
               </div>
             </section>
           </div>
+          )}
         </div>
 
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">

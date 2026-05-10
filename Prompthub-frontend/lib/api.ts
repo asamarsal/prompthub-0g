@@ -19,7 +19,7 @@ const COINGECKO_URL = `https://api.coingecko.com/api/v3/simple/price?ids=${encod
  * Returns a fallback of 0.50 if the request fails (0G is currently below $1).
  */
 export async function fetch0GPrice(): Promise<number> {
-    const FALLBACK_PRICE = 0.50 // Realistic fallback — 0G is currently below $1
+    const FALLBACK_PRICE = 0.5 // Realistic fallback — 0G is currently below $1
     try {
         const apiKey = process.env.NEXT_PUBLIC_COINGECKO_API_KEY
         const url = apiKey
@@ -40,7 +40,7 @@ export async function fetch0GPrice(): Promise<number> {
 
         console.warn(`CoinGecko response missing ${COINGECKO_COIN_ID}.usd, using fallback.`)
         return FALLBACK_PRICE
-    } catch (err) {
+    } catch {
         // Suppress console.error so it doesn't trigger the Next.js dev error overlay
         console.warn("CoinGecko API blocked or offline. Using fallback 0G price.")
         return FALLBACK_PRICE
@@ -65,7 +65,7 @@ function wrapAxiosWithPayment(api: AxiosInstance, account: any) {
         async (error) => {
             const response = error?.response
             const originalRequest = error?.config
-            if (!response || response.status !== 402 || originalRequest?._x402Retry) {
+            if (response?.status !== 402 || originalRequest?._x402Retry) {
                 throw error
             }
 
@@ -94,7 +94,7 @@ function wrapAxiosWithPayment(api: AxiosInstance, account: any) {
 
             originalRequest._x402Retry = true
             originalRequest.headers = {
-                ...(originalRequest.headers ?? {}),
+                ...originalRequest.headers,
                 "X-Payment": tx.hash,
             }
 
@@ -133,11 +133,11 @@ export function getX402Client(account: any) {
         api.defaults.headers.common.Authorization = `Bearer ${token}`
     }
 
-    return wrapAxiosWithPayment(api, account as any)
+    return wrapAxiosWithPayment(api, account)
 }
 
 export function getApiToken(): string | null {
-    if (typeof window === "undefined") return null
+    if (typeof globalThis.window === "undefined") return null
     return localStorage.getItem(TOKEN_KEY)
 }
 
@@ -150,7 +150,7 @@ export function clearApiToken(): void {
 }
 
 export function getAdminToken(): string | null {
-    if (typeof window === "undefined") return null
+    if (typeof globalThis.window === "undefined") return null
     return localStorage.getItem(ADMIN_TOKEN_KEY)
 }
 
@@ -244,13 +244,17 @@ export async function uploadPromptAsset(file: File, groupId?: string): Promise<U
  */
 export async function uploadTo0GStorage(
     file: File,
-    type: "content" | "attachment"
-): Promise<{ rootHash: string; txHash: string; path: string }> {
+    type: "content" | "attachment",
+    strict = false
+): Promise<{ rootHash: string; txHash: string | null; path: string; storage?: string }> {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("type", type)
+    if (strict) {
+        formData.append("strict", "1")
+    }
 
-    return request<{ rootHash: string; txHash: string; path: string }>(
+    return request<{ rootHash: string; txHash: string | null; path: string; storage?: string }>(
         "/api/storage/upload",
         { method: "POST", body: formData },
         true
@@ -262,7 +266,7 @@ export async function uploadTo0GStorage(
  */
 export async function downloadFrom0GStorage(rootHash: string): Promise<Blob> {
     const token = getApiToken()
-    const res = await fetch(`${BASE_URL}/api/storage/download/${encodeURIComponent(rootHash)}`, {
+    const res = await fetch(`/api/storage-download?rootHash=${encodeURIComponent(rootHash)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (!res.ok) {
@@ -425,7 +429,13 @@ export async function fetchBookmarks(): Promise<any> {
  * GET /api/prompts/{id}/content
  * Returns the premium content of a prompt. Protected by x402.
  */
-export async function fetchPremiumContent(promptId: string | number, account: any): Promise<{ original_content: string }> {
+export async function fetchPremiumContent(promptId: string | number, account: any): Promise<{
+    original_content: string
+    negative_prompt?: string | null
+    usage_notes?: string | null
+    root_hash?: string | null
+    storage_refs?: any
+}> {
     const client = getX402Client(account)
     const res = await client.get(`/api/prompts/${promptId}/content`)
     return res.data
@@ -543,7 +553,7 @@ export async function deleteAiModel(id: number): Promise<{ message: string }> {
  */
 export async function getPrompts(params?: Record<string, string>): Promise<PaginatedResponse<any>> {
     const qs = params ? new URLSearchParams(params).toString() : '';
-    const url = `/api/prompts${qs ? `?${qs}` : ''}`;
+    const url = qs ? `/api/prompts?${qs}` : "/api/prompts";
     return request<PaginatedResponse<any>>(url);
 }
 
@@ -607,10 +617,27 @@ export async function scorePrompt(id: string, promptText?: string): Promise<{
     reproducibility: number
     innovation: number
     reasoning: string
+    source?: "0g-compute" | "heuristic"
 }> {
     return request(`/api/prompts/${id}/score`, {
         method: "POST",
         body: JSON.stringify(promptText ? { prompt_text: promptText } : {}),
+    })
+}
+
+export async function previewPromptScore(promptText: string): Promise<{
+    overall: number
+    clarity: number
+    completeness: number
+    safety: number
+    reproducibility: number
+    innovation: number
+    reasoning: string
+    source?: "0g-compute" | "heuristic"
+}> {
+    return request("/api/prompts/preview-score", {
+        method: "POST",
+        body: JSON.stringify({ prompt_text: promptText }),
     })
 }
 
@@ -878,6 +905,10 @@ export async function submitContestEntry(id: string, data: {
     preview_image_url: string;
     prompt_used?: string;
     tool?: string;
+    storage_root_hash?: string;
+    storage_tx_hash?: string | null;
+    ipfs_metadata_uri?: string;
+    onchain_entry_id?: string;
 }): Promise<any> {
     return request<any>(`/api/contests/${id}/submissions`, {
         method: "POST",
@@ -888,10 +919,10 @@ export async function submitContestEntry(id: string, data: {
 /**
  * POST /api/contests/{id}/winner
  */
-export async function declareContestWinner(id: string, submissionId: string): Promise<any> {
+export async function declareContestWinner(id: string, submissionId: string, txId: string, place = 1): Promise<any> {
     return request<any>(`/api/contests/${id}/winner`, {
         method: "POST",
-        body: JSON.stringify({ submission_id: submissionId }),
+        body: JSON.stringify({ submission_id: submissionId, tx_id: txId, place }),
     });
 }
 
@@ -903,6 +934,7 @@ export async function createHireRequest(data: {
     project_brief: string;
     budget_0g?: number;
     tx_id: string;
+    onchain_job_id?: number;
 }): Promise<any> {
     return request<any>("/api/hire", {
         method: "POST",
@@ -918,6 +950,23 @@ export async function verifyHireEscrow(id: string, txId?: string): Promise<any> 
         method: "POST",
         body: JSON.stringify(txId ? { tx_id: txId } : {}),
     });
+}
+
+export async function verifyHireCompletion(id: string, txId: string): Promise<any> {
+    return request<any>(`/api/hire/${id}/verify-completion`, {
+        method: "POST",
+        body: JSON.stringify({ tx_id: txId }),
+    });
+}
+
+export async function fetchMyHireRequests(): Promise<any[]> {
+    return request<any[]>("/api/hire/my-requests");
+}
+
+export async function syncAgentStatus(): Promise<any> {
+    return request<any>("/api/users/me/sync-agent", {
+        method: "POST",
+    })
 }
 
 // ─── Creator Profiles & Follow ─────────────────────────────────────────────

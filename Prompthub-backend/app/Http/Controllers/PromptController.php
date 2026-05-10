@@ -14,7 +14,9 @@ class PromptController extends Controller
 
     public function index(Request $request)
     {
-        $query = Prompt::with('user')->where('is_published', true);
+        $query = Prompt::with('user')
+            ->withCount(['bookmarkedBy as favorites_count'])
+            ->where('is_published', true);
 
         if ($user = auth('sanctum')->user()) {
             $query->withExists(['bookmarkedBy as is_bookmarked' => function($q) use ($user) {
@@ -99,7 +101,8 @@ class PromptController extends Controller
 
     public function show($id)
     {
-        $query = Prompt::with('user');
+        $query = Prompt::with('user')
+            ->withCount(['bookmarkedBy as favorites_count']);
 
         if ($user = auth('sanctum')->user()) {
             $query->withExists(['bookmarkedBy as is_bookmarked' => function($q) use ($user) {
@@ -107,7 +110,19 @@ class PromptController extends Controller
             }]);
         }
 
-        return response()->json($query->findOrFail($id));
+        $prompt = $query->findOrFail($id);
+        $prompt->increment('view_count');
+        $prompt->refresh()
+            ->load('user')
+            ->loadCount(['bookmarkedBy as favorites_count']);
+
+        if ($user = auth('sanctum')->user()) {
+            $prompt->is_bookmarked = $prompt->bookmarkedBy()
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        return response()->json($prompt);
     }
 
     public function store(Request $request)
@@ -124,12 +139,24 @@ class PromptController extends Controller
             'content_type' => 'required|string|in:TEXT,IMAGE,VIDEO,AUDIO,CODE',
             'is_nsfw' => 'boolean',
             'license_type' => 'required|string|in:FREE,COMMERCIAL,EXCLUSIVE',
+            'commercial_use_allowed' => 'nullable|boolean',
             'royalty_percentage' => 'nullable|integer|min:0|max:100',
             'og_tx_id' => 'nullable|string',
             'root_hash' => 'nullable|string',
+            'storage_manifest' => 'nullable|array',
+            'prompt_txt_root_hash' => 'nullable|string',
+            'prompt_txt_tx_hash' => 'nullable|string',
+            'preview_root_hash' => 'nullable|string',
+            'preview_tx_hash' => 'nullable|string',
+            'text_package_root_hash' => 'nullable|string',
+            'text_package_tx_hash' => 'nullable|string',
+            'ipfs_metadata_uri' => 'nullable|string',
+            'storage_status' => 'nullable|string|in:pending,uploaded,partial,failed',
             'currency' => 'nullable|string|in:0G,0G',
             'additional_info' => 'nullable|array',
             'original_content' => 'nullable|string',
+            'negative_prompt' => 'nullable|string|max:1000',
+            'usage_notes' => 'nullable|string|max:1000',
             'reference_images' => 'nullable|array',
             'watermarked_preview_url' => 'nullable|string',
         ]);
@@ -137,6 +164,14 @@ class PromptController extends Controller
         $validated['id'] = (string) \Illuminate\Support\Str::uuid();
         $validated['user_id'] = $request->user()->id ?? \App\Models\User::first()?->id;
         $validated['is_published'] = true;
+        $validated['ipfs_metadata_uri'] = $validated['ipfs_metadata_uri'] ?? $validated['cid_ipfs'];
+        $validated['root_hash'] = $validated['root_hash']
+            ?? $validated['text_package_root_hash']
+            ?? $validated['prompt_txt_root_hash']
+            ?? null;
+        $validated['storage_status'] = $validated['storage_status'] ?? (
+            !empty($validated['text_package_root_hash']) && !empty($validated['preview_root_hash']) ? 'uploaded' : 'pending'
+        );
         
         $prompt = Prompt::create($validated);
 
@@ -181,7 +216,10 @@ class PromptController extends Controller
                 'contract_token_id' => $verification['tokenId'],
                 'buyer_address' => $verification['buyer'],
                 'original_content' => $prompt->original_content ?? 'Sample prompt content for demonstration.',
+                'negative_prompt' => $prompt->negative_prompt,
+                'usage_notes' => $prompt->usage_notes,
                 'root_hash' => $prompt->root_hash,
+                'storage_refs' => $this->storageRefsPayload($prompt),
                 'content_hash' => $prompt->original_content ? hash('sha256', $prompt->original_content) : null,
             ]);
         } catch (\Exception $e) {
@@ -243,9 +281,32 @@ class PromptController extends Controller
         return response()->json([
             'id' => $prompt->id,
             'original_content' => $prompt->original_content ?? 'This is the premium prompt content protected by purchase verification.',
+            'negative_prompt' => $prompt->negative_prompt,
+            'usage_notes' => $prompt->usage_notes,
             'root_hash' => $prompt->root_hash,
+            'storage_refs' => $this->storageRefsPayload($prompt),
             'content_hash' => $prompt->original_content ? hash('sha256', $prompt->original_content) : null,
         ]);
+    }
+
+    public function storageRefs($id)
+    {
+        $prompt = Prompt::findOrFail($id);
+        $user = auth('sanctum')->user();
+
+        $isOwner = $user && $user->id === $prompt->user_id;
+        $hasPurchased = false;
+        if ($user && !$isOwner) {
+            $hasPurchased = \App\Models\Transaction::where('prompt_id', $prompt->id)
+                ->where('buyer_address', $this->normalizeAddress((string) $user->wallet_address))
+                ->exists();
+        }
+
+        if (!$isOwner && !$hasPurchased) {
+            return response()->json(['message' => 'Payment Required', 'x402' => true], 402);
+        }
+
+        return response()->json($this->storageRefsPayload($prompt));
     }
 
     public function deactivate($id, Request $request)
@@ -323,5 +384,21 @@ class PromptController extends Controller
     {
         $address = strtolower(trim($address));
         return preg_match('/^0x[a-f0-9]{40}$/', $address) ? $address : null;
+    }
+
+    private function storageRefsPayload(Prompt $prompt): array
+    {
+        return [
+            'root_hash' => $prompt->root_hash,
+            'prompt_txt_root_hash' => $prompt->prompt_txt_root_hash,
+            'prompt_txt_tx_hash' => $prompt->prompt_txt_tx_hash,
+            'preview_root_hash' => $prompt->preview_root_hash,
+            'preview_tx_hash' => $prompt->preview_tx_hash,
+            'text_package_root_hash' => $prompt->text_package_root_hash,
+            'text_package_tx_hash' => $prompt->text_package_tx_hash,
+            'ipfs_metadata_uri' => $prompt->ipfs_metadata_uri ?? $prompt->cid_ipfs,
+            'storage_manifest' => $prompt->storage_manifest,
+            'storage_status' => $prompt->storage_status,
+        ];
     }
 }

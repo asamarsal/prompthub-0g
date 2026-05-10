@@ -19,12 +19,12 @@ class StorageController extends Controller
         $validated = $request->validate([
             'file' => 'required|file|max:51200',
             'type' => 'nullable|string|in:content,attachment',
+            'strict' => 'nullable|boolean',
         ]);
 
-        $result = $this->zeroGStorage->upload(
-            $validated['file'],
-            $validated['type'] ?? 'attachment'
-        );
+        $result = ($validated['strict'] ?? false)
+            ? $this->zeroGStorage->uploadStrict($validated['file'], $validated['type'] ?? 'attachment')
+            : $this->zeroGStorage->uploadBestEffort($validated['file'], $validated['type'] ?? 'attachment');
 
         return response()->json($result);
     }
@@ -39,4 +39,3 @@ class StorageController extends Controller
         return Storage::disk('local')->download($path);
     }
 }
-

@@ -6,10 +6,10 @@ import { AppShell } from "@/components/app-shell"
 import { PromptCard } from "@/components/prompt-card"
 import { PurchaseModal } from "@/components/purchase-modal"
 import { prompts as mockPrompts } from "@/lib/mock-data"
-import { ChevronRight, Check, Copy, Heart, Share2, Star, ExternalLink, Zap, Lock, BadgeCheck, Clock, Unlock, Loader2, FileText } from "lucide-react"
+import { ChevronRight, Check, Copy, Heart, Share2, Star, ExternalLink, Zap, Lock, BadgeCheck, Clock, Unlock, Loader2, FileText, Eye, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, getSimilarPrompts } from "@/lib/api"
+import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, getSimilarPrompts, downloadFrom0GStorage } from "@/lib/api"
 import { SimilarPrompts } from "@/components/similar-prompts"
 import { useWallet } from "@/lib/wallet-context"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
@@ -29,6 +29,18 @@ const mockTxHistory = [
     { buyer: "0xij90...kl12", price: 0.005, date: "2026-02-25 18:42" },
     { buyer: "0xmn34...op56", price: 0.005, date: "2026-02-24 11:03" },
 ]
+
+function formatCompactNumber(value: number) {
+    return new Intl.NumberFormat("en", {
+        notation: "compact",
+        maximumFractionDigits: 1,
+    }).format(value || 0)
+}
+
+function shortHash(value?: string | null) {
+    if (!value) return "Not set"
+    return value.length > 20 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value
+}
 
 export default function PromptDetailPageContent({ params }: { params: { id: string } }) {
     const { id } = params
@@ -111,7 +123,18 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     txId: res.og_tx_id,
                     cid: res.cid_ipfs,
                     rootHash: res.root_hash || res.additional_info?.storage_root_hash || null,
+                    promptTxtRootHash: res.prompt_txt_root_hash || null,
+                    previewRootHash: res.preview_root_hash || null,
+                    textPackageRootHash: res.text_package_root_hash || null,
+                    ipfsMetadataUri: res.ipfs_metadata_uri || res.cid_ipfs || null,
+                    storageManifest: res.storage_manifest || res.additional_info?.storage_manifest || null,
                     creatorVerified: res.user?.is_verified ?? false,
+                    negativePrompt: res.negative_prompt || "",
+                    usageNotes: res.usage_notes || "",
+                    viewCount: Number(res.view_count || 0),
+                    favoritesCount: Number(res.favorites_count || 0),
+                    commercialUseAllowed: res.commercial_use_allowed ?? true,
+                    referenceImages: res.reference_images || [],
                 })
                 setIsBookmarked(!!res.is_bookmarked)
             } catch (err) {
@@ -175,7 +198,12 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
         try {
             setBookmarkLoading(true)
             const res = await toggleBookmark(prompt.id)
+            const previousBookmarked = isBookmarked
             setIsBookmarked(res.is_bookmarked)
+            setPrompt((prev: any) => ({
+                ...prev,
+                favoritesCount: Math.max(0, (prev?.favoritesCount || 0) + (res.is_bookmarked && !previousBookmarked ? 1 : !res.is_bookmarked && previousBookmarked ? -1 : 0)),
+            }))
 
             toast.success(res.is_bookmarked ? "Added to Collection" : "Removed from Collection", {
                 description: res.is_bookmarked
@@ -220,6 +248,17 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
         try {
             const res = await fetchPremiumContent(prompt.id, { address, enableX402Payment: true })
             setPremiumContent(res.original_content)
+            if (res.storage_refs) {
+                setPrompt((prev: any) => ({
+                    ...prev,
+                    rootHash: res.storage_refs.root_hash || prev?.rootHash,
+                    promptTxtRootHash: res.storage_refs.prompt_txt_root_hash || prev?.promptTxtRootHash,
+                    textPackageRootHash: res.storage_refs.text_package_root_hash || prev?.textPackageRootHash,
+                    previewRootHash: res.storage_refs.preview_root_hash || prev?.previewRootHash,
+                    ipfsMetadataUri: res.storage_refs.ipfs_metadata_uri || prev?.ipfsMetadataUri,
+                    storageManifest: res.storage_refs.storage_manifest || prev?.storageManifest,
+                }))
+            }
             toast.success("Content Unlocked!", {
                 description: "Your premium prompt content has been decrypted.",
                 duration: 4000,
@@ -234,6 +273,33 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
             })
         } finally {
             setUnlockLoading(false)
+        }
+    }
+
+    const handleDownloadAll = async () => {
+        if (!prompt || !premiumContent) return
+
+        try {
+            const preferredRootHash = prompt.textPackageRootHash || prompt.promptTxtRootHash || prompt.rootHash
+            const blob = preferredRootHash
+                ? await downloadFrom0GStorage(preferredRootHash)
+                : new Blob([premiumContent], { type: "text/plain" })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `prompt-${prompt.id}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
+        } catch (error) {
+            console.error("Storage download failed:", error)
+            const blob = new Blob([premiumContent], { type: "text/plain" })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `prompt-${prompt.id}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
+            toast.warning("0G Storage download unavailable, saved unlocked DB content instead.")
         }
     }
 
@@ -316,7 +382,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
 
                         <div className="mt-8">
                             <div className="flex gap-1 p-1 bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30]" role="tablist">
-                                {(["description", "reviews", "history"] as const).map((tab) => (
+                                {(["description", "guide", "reviews", "history"] as const).map((tab) => (
                                     <button
                                         key={tab}
                                         role="tab"
@@ -327,7 +393,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                             : "text-[#a78bfa] hover:text-[#e0d4ff] hover:bg-[#16161a]"
                                             }`}
                                     >
-                                        {tab === "description" ? "Description" : tab === "reviews" ? `Reviews (${prompt.reviewsCount || 0})` : "Tx History"}
+                                        {tab === "description" ? "Description" : tab === "guide" ? "Guide" : tab === "reviews" ? `Reviews (${prompt.reviewsCount || 0})` : "Tx History"}
                                     </button>
                                 ))}
                             </div>
@@ -339,6 +405,19 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                             <h3 className="text-xs font-mono font-bold text-[#a78bfa]/50 uppercase tracking-[0.2em] mb-3">Model Description</h3>
                                             <p className="text-[#e0d4ff]/90 leading-relaxed text-lg">{prompt.description}</p>
                                         </div>
+
+                                        {prompt.referenceImages?.length > 0 && (
+                                            <div>
+                                                <h3 className="text-xs font-mono font-bold text-[#a78bfa]/50 uppercase tracking-[0.2em] mb-3">Reference Gallery</h3>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                    {prompt.referenceImages.map((image: string, idx: number) => (
+                                                        <div key={`${image}-${idx}`} className="aspect-square bg-[#160f24]/60 border-2 border-[#2a2a30] overflow-hidden">
+                                                            <img src={image} alt={`Reference ${idx + 1}`} className="w-full h-full object-cover" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {prompt.additional_info && prompt.additional_info.length > 0 && (
                                             <div>
@@ -407,14 +486,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                         </div>
                                                         <div className="flex gap-2">
                                                             <button
-                                                                onClick={() => {
-                                                                    const blob = new Blob([premiumContent ?? ""], { type: "text/plain" })
-                                                                    const url = URL.createObjectURL(blob)
-                                                                    const a = document.createElement("a")
-                                                                    a.href = url
-                                                                    a.download = `prompt-${prompt.id}.txt`
-                                                                    a.click()
-                                                                }}
+                                                                onClick={handleDownloadAll}
                                                                 className="flex items-center gap-2 px-4 py-2 bg-[#b4ff39]/10 border border-[#b4ff39]/30 text-[#b4ff39] text-[10px] font-bold uppercase tracking-widest hover:bg-[#b4ff39]/20 transition-all"
                                                             >
                                                                 <Zap className="w-3 h-3" /> Download All
@@ -491,6 +563,42 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                         </div>
                                                     )}
                                                 </div>)}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "guide" && (
+                                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                        <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-6">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <BookOpen className="w-4 h-4 text-[#00ffff]" />
+                                                <h3 className="text-sm font-bold text-[#e0d4ff] uppercase tracking-widest">Usage Guide</h3>
+                                            </div>
+                                            <p className="text-sm leading-relaxed text-[#a78bfa] whitespace-pre-wrap">
+                                                {prompt.usageNotes || "No usage notes were provided by the creator."}
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-6">
+                                            <h3 className="text-sm font-bold text-[#e0d4ff] uppercase tracking-widest mb-3">Negative Prompt</h3>
+                                            <p className="text-sm leading-relaxed text-[#ff9ccf] whitespace-pre-wrap">
+                                                {prompt.negativePrompt || "No negative prompt was provided."}
+                                            </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div className="bg-[#160f24]/60 border-2 border-[#2a2a30] p-4">
+                                                <p className="text-[10px] text-[#a78bfa]/60 uppercase font-mono">Commercial Output</p>
+                                                <p className={`mt-1 text-sm font-bold ${prompt.commercialUseAllowed ? "text-[#b4ff39]" : "text-[#ff2d95]"}`}>
+                                                    {prompt.commercialUseAllowed ? "Allowed" : "Not allowed"}
+                                                </p>
+                                            </div>
+                                            <div className="bg-[#160f24]/60 border-2 border-[#2a2a30] p-4">
+                                                <p className="text-[10px] text-[#a78bfa]/60 uppercase font-mono">0G Storage</p>
+                                                <p className="mt-1 text-sm font-bold text-[#00ffff] truncate" title={prompt.rootHash || ""}>
+                                                    {prompt.rootHash ? `${prompt.rootHash.slice(0, 12)}...${prompt.rootHash.slice(-8)}` : "Not available"}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -654,6 +762,20 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                         See Price
                                         <ExternalLink className="w-2.5 h-2.5" />
                                     </a>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 my-6">
+                                    <div className="bg-[#0a001a]/60 border border-[#2a2a30] p-3">
+                                        <p className="text-[10px] text-[#a78bfa]/60 uppercase font-mono flex items-center gap-1">
+                                            <Eye className="w-3 h-3" /> Views
+                                        </p>
+                                        <p className="text-lg font-extrabold text-[#e0d4ff] mt-1">{formatCompactNumber(prompt.viewCount)}</p>
+                                    </div>
+                                    <div className="bg-[#0a001a]/60 border border-[#2a2a30] p-3">
+                                        <p className="text-[10px] text-[#a78bfa]/60 uppercase font-mono flex items-center gap-1">
+                                            <Heart className="w-3 h-3" /> Favorites
+                                        </p>
+                                        <p className="text-lg font-extrabold text-[#e0d4ff] mt-1">{formatCompactNumber(prompt.favoritesCount)}</p>
+                                    </div>
                                 </div>
                                 <div className="flex flex-col gap-2 mb-6 text-sm">
                                     <div className="flex justify-between">
@@ -846,6 +968,44 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                     </div>
                                 )}
 
+                                {/* Storage references */}
+                                <div className="mt-4 pt-4 border-t border-[#2a2a30]">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <p className="text-[10px] font-display font-black text-[#a78bfa] uppercase tracking-widest">Storage Refs</p>
+                                        <span className={`text-[8px] font-black uppercase tracking-widest ${prompt.textPackageRootHash || prompt.promptTxtRootHash ? "text-[#b4ff39]" : "text-[#ff2d95]"}`}>
+                                            {prompt.textPackageRootHash || prompt.promptTxtRootHash ? "0G Ready" : "Missing"}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        {[
+                                            ["Text Package", prompt.textPackageRootHash],
+                                            ["Prompt TXT", prompt.promptTxtRootHash],
+                                            ["Preview Image", prompt.previewRootHash],
+                                            ["Metadata IPFS", prompt.ipfsMetadataUri],
+                                        ].map(([label, value]) => (
+                                            <div key={label} className="flex items-center justify-between gap-3">
+                                                <span className="text-[10px] text-[#a78bfa]/60 uppercase">{label}</span>
+                                                <span
+                                                    className={`max-w-[150px] truncate text-right text-[10px] font-mono ${value ? "text-[#00ffff]" : "text-[#a78bfa]/35"}`}
+                                                    title={String(value || "Not set")}
+                                                >
+                                                    {shortHash(String(value || ""))}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {prompt.storageManifest && (
+                                        <p className="mt-3 text-[9px] text-[#a78bfa]/45 leading-relaxed">
+                                            Manifest includes first .txt, first preview image, and text package references.
+                                        </p>
+                                    )}
+                                    {!prompt.textPackageRootHash && !prompt.promptTxtRootHash && (
+                                        <p className="mt-3 text-[9px] font-bold text-[#ff2d95] uppercase tracking-widest">
+                                            Critical prompt content is not linked to 0G Storage.
+                                        </p>
+                                    )}
+                                </div>
+
                                 {/* 0G Compute Quality Score */}
                                 <div className="mt-4 pt-4 border-t border-[#2a2a30]">
                                     <div className="flex items-center justify-between mb-3">
@@ -880,7 +1040,9 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                             {qualityScore.reasoning && (
                                                 <p className="text-[10px] text-[#a78bfa]/40 mt-1 italic leading-relaxed">{qualityScore.reasoning.substring(0, 150)}</p>
                                             )}
-                                            <p className="text-[8px] text-[#a78bfa]/30 uppercase tracking-widest mt-1">Powered by 0G Compute (Llama 3.1)</p>
+                                            <p className="text-[8px] text-[#a78bfa]/30 uppercase tracking-widest mt-1">
+                                                {qualityScore.source === "heuristic" ? "Heuristic fallback" : "Powered by 0G Compute"}
+                                            </p>
                                         </div>
                                     ) : (
                                         <p className="text-[10px] text-[#a78bfa]/40">Click "Run 0G Compute" to analyze prompt quality via AI inference.</p>

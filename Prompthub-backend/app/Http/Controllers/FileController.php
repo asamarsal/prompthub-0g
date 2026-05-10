@@ -159,7 +159,7 @@ class FileController extends Controller
     public function uploadPromptAsset(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|max:10240',
+            'file' => 'required|file|max:51200',
             'group_id' => 'nullable|string|max:255',
         ]);
 

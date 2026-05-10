@@ -33,8 +33,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             CategorySeeder::class,
             AiModelSeeder::class,
-            PromptSeeder::class,
-            ContestSeeder::class,
+            SpecializationSeeder::class,
+            // PromptSeeder::class,
+            // ContestSeeder::class,
         ]);
     }
 }
