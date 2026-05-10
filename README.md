@@ -5,7 +5,7 @@
 <h1 align="center">PromptHub</h1>
 
 <p align="center">
-  <strong>The On-Chain Economy for AI Prompt Creators</strong><br/>
+  <strong>The Onchain Economy for AI Prompt Creators</strong><br/>
   NFT ownership · Escrow freelancing · Brand contests . powered by 5 smart contracts on 0G Galileo Testnet
 </p>
 
@@ -17,7 +17,7 @@
 
 ## What is PromptHub?
 
-PromptHub is a full-stack Web2.5 marketplace where AI creators mint, sell, and license prompts as **ERC-721 NFTs** on the **0G blockchain**. It combines Web2-grade UX (real-time messaging, creator dashboards, analytics) with trustless on-chain logic (marketplace, escrow hire, contest payouts). Every transaction is verifiable on 0G Explorer. No middleman. No trust required.
+PromptHub is a full-stack Web marketplace where AI creators mint, sell, and license prompts as **ERC-721 NFTs** on the **0G blockchain**. It combines Web2-grade UX (real-time messaging, creator dashboards, analytics) with trustless onchain logic (marketplace, escrow hire, contest payouts). Every transaction is verifiable on 0G Explorer. No middleman. No trust required.
 
 ---
 
@@ -25,12 +25,12 @@ PromptHub is a full-stack Web2.5 marketplace where AI creators mint, sell, and l
 
 The AI prompt market is worth **$500M+** and growing, yet it runs entirely on trust:
 
-1. **No ownership proof** . Creators upload prompts to centralized platforms (PromptBase, ChatGPT Store) with zero on-chain provenance. Copy-paste piracy is rampant.
+1. **No ownership proof** . Creators upload prompts to centralized platforms (PromptBase, ChatGPT Store) with zero onchain provenance. Copy paste piracy is rampant.
 2. **No secure freelancing** . AI freelancers accept jobs on Fiverr/Upwork with 20% platform fees and no escrow guarantee. Disputes are resolved by the platform, not code.
 3. **No composability** . Prompts are static text files. They can't be resold, licensed, or composed into agent workflows programmatically.
-4. **No creator analytics** . Creators have no real-time visibility into earnings, buyer behavior, or asset performance.
+4. **No creator analytics** . Creators have no realtime visibility into earnings, buyer behavior, or asset performance.
 
-**Bottom line:** AI creators produce high-value intellectual property but have no infrastructure to own, monetize, or protect it.
+**Bottom line:** AI creators produce high value intellectual property but have no infrastructure to own, monetize, or protect it.
 
 ---
 
@@ -41,8 +41,8 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 ### 1. NFT Marketplace ( `PromptHubMarketplace.sol`)
 
 - Prompts are minted as **ERC-721 NFTs** with encrypted content
-- Purchase triggers on-chain ownership transfer + content decryption
-- Built-in **royalty system** (creators earn on every resale)
+- Purchase triggers onchain ownership transfer + content decryption
+- Built in **royalty system** (creators earn on every resale)
 - **2.5% platform fee** collected by Treasury contract
 - Backend verifies purchase via `eth_getTransactionReceipt` RPC call to 0G node
 
@@ -55,23 +55,23 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 
 ### 3. Brand Contests (`PromptHubContests.sol`)
 
-- Brands fund multi-tier prize pools (1st, 2nd, 3rd place)
-- Artists submit entries on-chain
+- Brands fund multi tier prize pools (1st, 2nd, 3rd place)
+- Artists submit entries onchain
 - Winners declared by brand, **instant payout from contract** . no manual transfers
-- Full transparency: prize pool, entries, and winners all on-chain
+- Full transparency: prize pool, entries, and winners all onchain
 
 ### 4. Creator Command Center (Web2 Dashboard)
 
-- Real-time earnings analytics and transaction history
+- Realtime earnings analytics and transaction history
 - Asset management: list, delist, relist, update pricing
 - Messaging system with WebSocket (Laravel Reverb)
 - Follower/connection system, reviews, and reputation scores
 
 ### Bonus: `AgentRegistry.sol` (ERC-7857 Inspired)
 
-- On-chain identity for AI creators and autonomous agents
+- Onchain identity for AI creators and autonomous agents
 - Verification status, reputation score, completed job count
-- Foundation for future agent-to-agent prompt trading
+- Foundation for future agent to agent prompt trading
 
 ---
 
@@ -83,9 +83,9 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 
 - **Solidity 0.8.24** with optimizer (200 runs) targeting `cancun` EVM
 - **Hardhat** for compilation, testing, and deployment to 0G Galileo (chain ID: `16602`)
-- **On-chain verification**: Backend calls `eth_getTransactionReceipt` directly to 0G RPC. no reliance on third-party indexers
-- **Content gating**: Prompt content is encrypted. only verified on-chain owners can decrypt via backend API
-- **Real-time**: WebSocket via Laravel Reverb for messaging, typing indicators, and notifications
+- **Onchain verification**: Backend calls `eth_getTransactionReceipt` directly to 0G RPC. no reliance on third party indexers
+- **Content gating**: Prompt content is encrypted. only verified onchain owners can decrypt via backend API
+- **Realtime**: WebSocket via Laravel Reverb for messaging, typing indicators, and notifications
 
 ---
 
@@ -99,14 +99,14 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| NFT Marketplace | **Live** | List, buy, delist, relist prompts with on-chain ownership |
+| NFT Marketplace | **Live** | List, buy, delist, relist prompts with onchain ownership |
 | Escrow Hire | **Live** | P2P freelance with smart contract escrow |
-| Brand Contests | **Live** | Multi-tier prize pools with instant payout |
-| Creator Dashboard | **Live** | Real-time analytics, earnings tracking, asset management |
-| Messaging | **Live** | WebSocket real-time chat between creators and buyers |
+| Brand Contests | **Live** | Multi tier prize pools with instant payout |
+| Creator Dashboard | **Live** | Realtime analytics, earnings tracking, asset management |
+| Messaging | **Live** | WebSocket realtime chat between creators and buyers |
 | Smart Contracts | **5 contracts** | Marketplace, Escrow, Contests, Treasury, AgentRegistry |
-| On-chain Verification | **Working** | Backend verifies purchases via 0G RPC |
-| MetaMask Integration | **Working** | Auto-switch to 0G Galileo network |
+| Onchain Verification | **Working** | Backend verifies purchases via 0G RPC |
+| MetaMask Integration | **Working** | Autoswitch to 0G Galileo network |
 
 **Live URLs:**
 
@@ -121,14 +121,14 @@ We didn't just "deploy on 0G". we built specifically **for** 0G's architecture:
 
 | 0G Feature | How PromptHub Uses It |
 |------------|----------------------|
-| **0G EVM (Galileo)** | 5 Solidity contracts deployed. all financial logic runs trustlessly on-chain |
-| **0G Storage Layer** | Encrypted prompt content stored on decentralized storage. censorship-resistant, owner-gated |
+| **0G EVM (Galileo)** | 5 Solidity contracts deployed. all financial logic runs trustlessly onchain |
+| **0G Storage Layer** | Encrypted prompt content stored on decentralized storage. censorship resistant, owner gated |
 | **High throughput** | Marketplace transactions (mint, buy, transfer) execute in seconds. Web2-like UX |
-| **Low gas fees** | Micro-transactions viable. prompts can be priced at fractions of 0G tokens |
+| **Low gas fees** | Micro transactions viable. prompts can be priced at fractions of 0G tokens |
 | **0G Explorer** | Every transaction (purchase, escrow deposit, contest payout) is publicly verifiable |
 | **EVM compatibility** | Standard ERC-721 + custom contracts. composable with any 0G dApp or agent framework |
 
-**Why not other chains?** 0G is purpose-built for AI workloads. Its modular storage layer lets us store encrypted prompt data natively. no need for external IPFS pinning services. The high throughput means our marketplace can handle real-time trading without congestion.
+**Why not other chains?** 0G is purpose built for AI workloads. Its modular storage layer lets us store encrypted prompt data natively. no need for external IPFS pinning services. The high throughput means our marketplace can handle realtime trading without congestion.
 
 ---
 
@@ -136,9 +136,9 @@ We didn't just "deploy on 0G". we built specifically **for** 0G's architecture:
 
 | Feature | PromptBase | Fiverr | **PromptHub** |
 |---------|-----------|-----------|---------------|
-| On-chain ownership | No | No | **ERC-721 NFT** |
+| Onchain ownership | No | No | **ERC-721 NFT** |
 | Trustless escrow | No | No | **Smart contract** |
-| Creator royalties | No | No | **On-chain, automatic** |
+| Creator royalties | No | No | **Onchain, automatic** |
 | Platform fee | 20% | 20% | **2.5%** |
 | Verifiable transactions | No | No | **0G Explorer** |
 | Decentralized storage | No | No | **0G Storage** |
@@ -155,7 +155,7 @@ We didn't just "deploy on 0G". we built specifically **for** 0G's architecture:
 | Backend | Laravel 12, PostgreSQL, Redis, Laravel Reverb (WebSocket) |
 | Smart Contracts | Solidity 0.8.24, Hardhat, OpenZeppelin patterns |
 | Blockchain | 0G Galileo Testnet (Chain ID: 16602) |
-| Storage | 0G Storage Layer / IPFS-compatible |
+| Storage | 0G Storage Layer / IPFS compatible |
 | Auth | MetaMask wallet + Laravel Sanctum tokens |
 
 ---
@@ -225,7 +225,7 @@ npm run dev
 | `PromptHubTreasury` | Platform fee collection |
 | `PromptHubMarketplace` | ERC-721 NFT marketplace with versioning & royalties |
 | `PromptHubEscrowHire` | P2P freelance escrow with dispute resolution |
-| `PromptHubContests` | Multi-winner contest with on-chain prize pools |
+| `PromptHubContests` | Multi-winner contest with onchain prize pools |
 | `AgentRegistry` | AI creator identity & reputation (ERC-7857 inspired) |
 
 ---
@@ -265,22 +265,22 @@ prompthub-0g/
 
 - **5 smart contracts** deployed on 0G Galileo. not a token swap, a full application layer
 - **0G Storage** for encrypted prompt data. using the chain's native storage, not external services
-- **On-chain verification** via direct RPC calls to 0G node. backend is a thin verification layer, not a trust bottleneck
+- **Onchain verification** via direct RPC calls to 0G node. backend is a thin verification layer, not a trust bottleneck
 - Full Hardhat pipeline. compile, test, deploy. reproducible by any developer
 
 ### Most Innovative AI x Blockchain Use Case
 
 - First platform to treat **AI prompts as financial assets** with ERC-721 ownership
-- **AgentRegistry** (ERC-7857 inspired). on-chain identity for AI agents, enabling future agent-to-agent commerce
-- Content gating via on-chain ownership. only verified NFT holders can access prompt data
-- Composable: prompts can be integrated into any 0G-based AI agent workflow
+- **AgentRegistry** (ERC-7857 inspired). onchain identity for AI agents, enabling future agent-to-agent commerce
+- Content gating via onchain ownership. only verified NFT holders can access prompt data
+- Composable: prompts can be integrated into any 0G based AI agent workflow
 
 ### Best Creator Experience
 
-- **Web2 UX, Web3 ownership**: MetaMask login, one-click purchase, instant content delivery
+- **Web2 UX, Web3 ownership**: MetaMask login, one click purchase, instant content delivery
 - **2.5% fee** vs industry standard 20-30%. creators keep 97.5% of revenue
-- Real-time dashboard with earnings analytics, not just a transaction list
-- Built-in reputation system: reviews, ratings, follower counts. all tied to on-chain identity
+- Realtime dashboard with earnings analytics, not just a transaction list
+- Built in reputation system: reviews, ratings, follower counts. all tied to onchain identity
 
 ---
 
@@ -288,9 +288,9 @@ prompthub-0g/
 
 The AI economy needs infrastructure, not just marketplaces. PromptHub is building the **ownership layer** for AI intellectual property:
 
-- **Today**: Creators mint, sell, and license prompts as on-chain assets
+- **Today**: Creators mint, sell, and license prompts as onchain assets
 - **Next**: AI agents autonomously trade prompts via AgentRegistry
-- **Future**: A composable economy where prompts, workflows, and AI models are all tradable on-chain assets on 0G
+- **Future**: A composable economy where prompts, workflows, and AI models are all tradable onchain assets on 0G
 
 **PromptHub is not a marketplace with a blockchain bolted on. It's a blockchain-native economy designed from day one for AI creators.**
 
@@ -300,19 +300,19 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 
 ### 🏆 Track 3: Agentic Economy & Autonomous Applications
 
-> *"Building the financial and service layer for the AI era. from foundational economic protocols to creative AI-driven consumer dApps."*
+> *"Building the financial and service layer for the AI era. from foundational economic protocols to creative AI driven consumer dApps."*
 
 ---
 
-#### ✅ Financial Rails (Micropayments, Automated Billing & Revenue-Sharing)
+#### ✅ Financial Rails (Micropayments, Automated Billing & Revenue Sharing)
 
 | What We Built | Implementation |
 |---|---|
-| **x402 Payment Protocol** | HTTP-native micropayment.  buyer sends on-chain tx hash in header, backend verifies receipt via 0G RPC, content unlocks instantly. Zero-click payment UX for agents and humans. |
-| **Smart Contract Escrow** | `PromptHubEscrowHire.sol` . funds locked on-chain, auto-release on completion, timeout protection. No human arbitration. |
-| **Contest Prize Distribution** | `PromptHubContests.sol`. multi-tier prize pool held in escrow, instant on-chain payout to winners. |
-| **Treasury & Auto Fee Collection** | `PromptHubTreasury.sol`. 2.5% platform fee auto-collected per sale. Fully transparent on-chain accounting. |
-| **On-Chain Royalties** | Creators earn on every resale. Enforced at smart contract level. Cannot be bypassed. |
+| **x402 Payment Protocol** | HTTP native micropayment.  buyer sends onchain tx hash in header, backend verifies receipt via 0G RPC, content unlocks instantly. Zero click payment UX for agents and humans. |
+| **Smart Contract Escrow** | `PromptHubEscrowHire.sol` . funds locked onchain, auto release on completion, timeout protection. No human arbitration. |
+| **Contest Prize Distribution** | `PromptHubContests.sol`. multi tier prize pool held in escrow, instant onchain payout to winners. |
+| **Treasury & Auto Fee Collection** | `PromptHubTreasury.sol`. 2.5% platform fee auto collected per sale. Fully transparent onchain accounting. |
+| **Onchain Royalties** | Creators earn on every resale. Enforced at smart contract level. Cannot be bypassed. |
 
 ---
 
@@ -322,10 +322,10 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 |---|---|
 | **NFT Prompt Marketplace** | 5 Solidity contracts on 0G Galileo. ERC-721 minting, purchase, ownership transfer, delisting, relisting |
 | **AI Quality Scoring** | 0G Compute (Llama 3.1-8B-Instruct) scores prompts on 5 dimensions: clarity, completeness, safety, reproducibility, innovation |
-| **AI Plagiarism Detection** | Two-phase: DB keyword matching + 0G Compute semantic analysis. Blocks stolen/duplicate content before listing. |
+| **AI Plagiarism Detection** | Two phase: DB keyword matching + 0G Compute semantic analysis. Blocks stolen/duplicate content before listing. |
 | **AI Recommendations** | Metadata matching + LLM-enhanced semantic similarity via 0G Compute for prompt discovery |
 | **Decentralized Content Storage** | Encrypted prompt content on 0G Storage with root hash verification. Preview images on IPFS/Pinata. |
-| **Watermark Protection** | Auto-generated tiled watermark on preview images via PHP GD . prevents screenshot theft |
+| **Watermark Protection** | Auto generated tiled watermark on preview images via PHP GD . prevents screenshot theft |
 
 ---
 
@@ -333,22 +333,22 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 
 | What We Built | Implementation |
 |---|---|
-| **AgentRegistry.sol** | On-chain identity & reputation layer for creators and AI agents. `isVerified(address)` callable by any 0G dApp. |
-| **Wallet-Only Authentication** | No email/password. Pure wallet-based auth via Sanctum tokens. Agent-compatible from day one. |
+| **AgentRegistry.sol** | Onchain identity & reputation layer for creators and AI agents. `isVerified(address)` callable by any 0G dApp. |
+| **Wallet-Only Authentication** | No email/password. Pure wallet based auth via Sanctum tokens. Agent compatible from day one. |
 | **Programmable Content Access** | x402 middleware enables any AI agent to purchase and consume prompts programmatically via standard HTTP headers. |
 | **Full REST API (50+ endpoints)** | Agents can autonomously: search prompts, check quality scores, purchase, download content, leave reviews. |
 
 ---
 
-#### ✅ Operational Tools (Self-Custodial & AI-Governed)
+#### ✅ Operational Tools (Self Custodial & AI Governed)
 
 | What We Built | Implementation |
 |---|---|
-| **Creator Command Center** | Real-time dashboard: total earnings, sales count, active prompts, average rating, monthly analytics chart |
-| **WebSocket Messaging** | Laravel Reverb. private channels per wallet, typing indicators, read receipts, real-time delivery |
-| **Social Graph** | Connections (friend requests), follows, reviews, reputation scores. all wallet-addressed |
-| **Real-Time Notifications** | Push via WebSocket + persistent in-app notification store |
-| **Self-Custodial Wallets** | Users control their own keys via MetaMask. Platform never holds funds. All financial logic is on-chain. |
+| **Creator Command Center** | Realtime dashboard: total earnings, sales count, active prompts, average rating, monthly analytics chart |
+| **WebSocket Messaging** | Laravel Reverb. private channels per wallet, typing indicators, read receipts, realtime delivery |
+| **Social Graph** | Connections (friend requests), follows, reviews, reputation scores. all wallet addressed |
+| **Realtime Notifications** | Push via WebSocket + persistent in app notification store |
+| **Self Custodial Wallets** | Users control their own keys via MetaMask. Platform never holds funds. All financial logic is onchain. |
 
 ---
 
@@ -357,9 +357,9 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 | 0G Component | PromptHub Usage |
 |---|---|
 | **0G EVM (Galileo Testnet)** | 5 deployed smart contracts. Marketplace, Escrow, Contests, Treasury, AgentRegistry |
-| **0G Storage** | Encrypted prompt content stored with root hash verification and owner-gated decryption |
+| **0G Storage** | Encrypted prompt content stored with root hash verification and owner gated decryption |
 | **0G Compute** | AI scoring, plagiarism detection, and recommendation engine via Llama 3.1-8B-Instruct |
-| **0G RPC (Direct)** | `eth_getTransactionReceipt` calls for real-time purchase verification in x402 middleware |
+| **0G RPC (Direct)** | `eth_getTransactionReceipt` calls for realtime purchase verification in x402 middleware |
 
 ---
 
