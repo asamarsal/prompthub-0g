@@ -44,7 +44,7 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 - Purchase triggers onchain ownership transfer + content decryption
 - Built in **royalty system** (creators earn on every resale)
 - **2.5% platform fee** collected by Treasury contract
-- Backend verifies purchase via `eth_getTransactionReceipt` RPC call to 0G node
+- **Event-Aware Verification**: Backend verifies purchases and events (e.g., `JobCreated`, `ContestFunded`) directly via 0G RPC by parsing specific event topics, preventing transaction spoofing
 
 ### 2. Escrow Hire (P2P Freelancing) (`PromptHubEscrowHire.sol`)
 
@@ -105,7 +105,7 @@ PromptHub solves this with **4 interconnected products**, each backed by a dedic
 | Creator Dashboard | **Live** | Realtime analytics, earnings tracking, asset management |
 | Messaging | **Live** | WebSocket realtime chat between creators and buyers |
 | Smart Contracts | **5 contracts** | Marketplace, Escrow, Contests, Treasury, AgentRegistry |
-| Onchain Verification | **Working** | Backend verifies purchases via 0G RPC |
+| Event-Aware Verification | **Working** | Backend strictly verifies on-chain events (purchases, escrows, contests) via 0G RPC |
 | MetaMask Integration | **Working** | Autoswitch to 0G Galileo network |
 
 **Live URLs:**
@@ -122,7 +122,7 @@ We didn't just "deploy on 0G". we built specifically **for** 0G's architecture:
 | 0G Feature | How PromptHub Uses It |
 |------------|----------------------|
 | **0G EVM (Galileo)** | 5 Solidity contracts deployed. all financial logic runs trustlessly onchain |
-| **0G Storage Layer** | Encrypted prompt content stored on decentralized storage. censorship resistant, owner gated |
+| **0G Storage Layer** | Hosts critical marketplace artifacts (prompt `.txt`, first preview image, and text packages) with strict Merkle root hash verification and owner-gated decryption |
 | **High throughput** | Marketplace transactions (mint, buy, transfer) execute in seconds. Web2-like UX |
 | **Low gas fees** | Micro transactions viable. prompts can be priced at fractions of 0G tokens |
 | **0G Explorer** | Every transaction (purchase, escrow deposit, contest payout) is publicly verifiable |
@@ -309,8 +309,8 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 | What We Built | Implementation |
 |---|---|
 | **x402 Payment Protocol** | HTTP native micropayment.  buyer sends onchain tx hash in header, backend verifies receipt via 0G RPC, content unlocks instantly. Zero click payment UX for agents and humans. |
-| **Smart Contract Escrow** | `PromptHubEscrowHire.sol` . funds locked onchain, auto release on completion, timeout protection. No human arbitration. |
-| **Contest Prize Distribution** | `PromptHubContests.sol`. multi tier prize pool held in escrow, instant onchain payout to winners. |
+| **Smart Contract Escrow** | `PromptHubEscrowHire.sol` . funds locked onchain, auto release on completion, timeout protection. Event-aware backend automatically synchronizes `JobCreated` and `JobCompleted` states. |
+| **Contest Prize Distribution** | `PromptHubContests.sol`. multi tier prize pool held in escrow, instant onchain payout to winners. Backend verifies `ContestFunded` and `WinnerDeclared` events for security. |
 | **Treasury & Auto Fee Collection** | `PromptHubTreasury.sol`. 2.5% platform fee auto collected per sale. Fully transparent onchain accounting. |
 | **Onchain Royalties** | Creators earn on every resale. Enforced at smart contract level. Cannot be bypassed. |
 
@@ -321,10 +321,10 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 | What We Built | Implementation |
 |---|---|
 | **NFT Prompt Marketplace** | 5 Solidity contracts on 0G Galileo. ERC-721 minting, purchase, ownership transfer, delisting, relisting |
-| **AI Quality Scoring** | 0G Compute (Llama 3.1-8B-Instruct) scores prompts on 5 dimensions: clarity, completeness, safety, reproducibility, innovation |
+| **AI Quality Scoring** | 0G Compute (Llama 3.1-8B-Instruct) scores prompts on 5 dimensions (clarity, completeness, safety, reproducibility, innovation) with a built-in **Heuristic Fallback** for maximum resilience and Pre-Publish preview. |
 | **AI Plagiarism Detection** | Two phase: DB keyword matching + 0G Compute semantic analysis. Blocks stolen/duplicate content before listing. |
 | **AI Recommendations** | Metadata matching + LLM-enhanced semantic similarity via 0G Compute for prompt discovery |
-| **Decentralized Content Storage** | Encrypted prompt content on 0G Storage with root hash verification. Preview images on IPFS/Pinata. |
+| **Tiered Decentralized Storage** | Strict policy: 0G Storage hosts the core `.txt` prompt, the first preview image, and the text package (prompt/negative/usage). IPFS Pinata is reserved exclusively for JSON metadata and the Storage Manifest, ensuring optimal use of both networks. |
 | **Watermark Protection** | Auto generated tiled watermark on preview images via PHP GD . prevents screenshot theft |
 
 ---
@@ -333,7 +333,7 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 
 | What We Built | Implementation |
 |---|---|
-| **AgentRegistry.sol** | Onchain identity & reputation layer for creators and AI agents. `isVerified(address)` callable by any 0G dApp. |
+| **AgentRegistry.sol** | Onchain identity & reputation layer for creators and AI agents. Features automated 1-click IPFS metadata onboarding and backend reputation caching (auto-synced every 10 mins). |
 | **Wallet-Only Authentication** | No email/password. Pure wallet based auth via Sanctum tokens. Agent compatible from day one. |
 | **Programmable Content Access** | x402 middleware enables any AI agent to purchase and consume prompts programmatically via standard HTTP headers. |
 | **Full REST API (50+ endpoints)** | Agents can autonomously: search prompts, check quality scores, purchase, download content, leave reviews. |
@@ -357,8 +357,8 @@ The AI economy needs infrastructure, not just marketplaces. PromptHub is buildin
 | 0G Component | PromptHub Usage |
 |---|---|
 | **0G EVM (Galileo Testnet)** | 5 deployed smart contracts. Marketplace, Escrow, Contests, Treasury, AgentRegistry |
-| **0G Storage** | Encrypted prompt content stored with root hash verification and owner gated decryption |
-| **0G Compute** | AI scoring, plagiarism detection, and recommendation engine via Llama 3.1-8B-Instruct |
+| **0G Storage** | Hosts critical marketplace artifacts (prompt `.txt`, first preview image, and text packages) with strict Merkle root hash verification and owner-gated decryption |
+| **0G Compute** | AI scoring, plagiarism detection, and recommendation engine via Llama 3.1-8B-Instruct (with heuristic fallback) |
 | **0G RPC (Direct)** | `eth_getTransactionReceipt` calls for realtime purchase verification in x402 middleware |
 
 ---
