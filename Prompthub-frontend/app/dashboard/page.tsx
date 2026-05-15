@@ -23,12 +23,13 @@ import { toast } from "sonner"
 
 
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number | string }>; label?: string }) {
   if (active && payload && payload.length) {
+    const value = Number(payload[0].value)
     return (
       <div className="glass-strong rounded-lg px-3 py-2 text-xs border border-[rgba(180,120,255,0.2)]">
         <p className="text-[#a78bfa] font-mono">{label}</p>
-        <p className="text-[#00ffff] font-extrabold">{payload[0].value.toFixed(4)} 0G</p>
+        <p className="text-[#00ffff] font-extrabold">{Number.isFinite(value) ? value.toFixed(4) : "0.0000"} 0G</p>
       </div>
     )
   }

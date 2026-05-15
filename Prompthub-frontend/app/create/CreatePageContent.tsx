@@ -53,7 +53,14 @@ function friendlyDeployError(error: any): string {
   }
   if (message.includes("could not coalesce error")) {
     const raw = JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+    if (raw.includes("0xdc88032e") && raw.includes("0000000000000000000000000000000000000000000000000000000000000000")) {
+      return "Deployment failed because price was 0. Price must be greater than 0 0G."
+    }
     return `Wallet/RPC returned an unknown error. Raw: ${raw.slice(0, 700)}`
+  }
+
+  if (message.includes("Price must be > 0")) {
+    return "The contract rejected the listing because the price is 0. Please set a price greater than 0."
   }
 
   return message
@@ -463,6 +470,10 @@ export default function CreatePageContent() {
       alert("Please upload the first preview image file so it can be stored in 0G Storage.")
       return
     }
+    if (Number(form.price) <= 0) {
+      alert("Price must be greater than 0 0G to list on the marketplace.")
+      return
+    }
 
     try {
       setDeploying(true)
@@ -815,7 +826,7 @@ export default function CreatePageContent() {
     { label: `Preview images (${form.referenceImages.length}/${MAX_REFERENCE_IMAGES})`, done: form.referenceImages.length > 0 },
     { label: form.promptMode === "write" ? "Written prompt ready" : `Files attached (${form.files.length}/10)`, done: hasPromptContent },
   ]
-  const readyToPublish = checklist.every((item) => item.done) && Number(form.price) >= 0 && (
+  const readyToPublish = checklist.every((item) => item.done) && Number(form.price) > 0 && (
     form.previewMode === "url" ? form.previewImageUrl.length > 0 : form.previewImageFile !== null
   )
 
@@ -823,7 +834,7 @@ export default function CreatePageContent() {
     form.title.length > 0 &&
     form.description.length > 0 &&
     (form.previewMode === "url" ? form.previewImageUrl.length > 0 : form.previewImageFile !== null),
-    Number(form.price) >= 0,
+    Number(form.price) > 0,
     hasPromptContent,
     true,
   ]

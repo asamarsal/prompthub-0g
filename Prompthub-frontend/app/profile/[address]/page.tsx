@@ -37,6 +37,36 @@ function CopyBtn({ text }: { text: string }) {
     )
 }
 
+function normalizeProfileStats(stats: any) {
+    return {
+        rating: Number(stats?.rating ?? stats?.avg_rating ?? 0),
+        projects: Number(stats?.projects ?? stats?.prompts_count ?? 0),
+        reviews: Number(stats?.reviews ?? stats?.reviews_count ?? 0),
+        sold: Number(stats?.sold ?? stats?.total_sales ?? 0),
+    }
+}
+
+function mapApiUserToProfile(user: ApiUser): UserProfile {
+    return {
+        id: user.id,
+        username: user.username ?? "",
+        name: user.name ?? "",
+        bio: user.bio ?? "",
+        avatar: "",
+        avatarUrl: user.avatar_url ?? "",
+        coverImage: user.cover_url ?? "",
+        roles: (user.roles as UserRole[]) ?? [],
+        activeRole: (user.roles as UserRole[])?.[0] ?? "buyer",
+        isAvailableForFreelance: user.is_available_for_freelance ?? true,
+        hourlyRate: user.hourly_rate ?? 0.002,
+        hourlyRateCurrency: user.hourly_rate_currency ?? "0G",
+        specialization_id: user.specialization_id ?? [],
+        specialties: user.specialties ?? [],
+        stats: normalizeProfileStats(user.stats),
+        activities: user.activities ?? [],
+    }
+}
+
 type Tab = "overview" | "portfolio" | "prompts" | "reviews" | "contests" | "collections" | "purchased"
 
 function ProfileContent({ params }: { params: { address: string } }) {
@@ -99,37 +129,19 @@ function ProfileContent({ params }: { params: { address: string } }) {
     const [isPromptsLoading, setIsPromptsLoading] = useState(false)
     const [isReviewsLoading, setIsReviewsLoading] = useState(false)
 
-    // Fetch public profile if viewing someone else
+    // Fetch public profile so aggregate stats stay fresh even on your own page.
     useEffect(() => {
-        if (mounted && !isOwn && decodedAddress) {
+        if (mounted && decodedAddress) {
             setIsLoading(true)
             fetchUserByAddress(decodedAddress)
-                .then(user => {
-                    setFetchedProfile({
-                        username: user.username ?? "",
-                        name: user.name ?? "",
-                        bio: user.bio ?? "",
-                        avatar: "",
-                        avatarUrl: user.avatar_url ?? "",
-                        coverImage: user.cover_url ?? "",
-                        roles: (user.roles as UserRole[]) ?? [],
-                        activeRole: (user.roles as UserRole[])?.[0] ?? "buyer",
-                        isAvailableForFreelance: user.is_available_for_freelance ?? true,
-                        hourlyRate: user.hourly_rate ?? 0.002,
-                        hourlyRateCurrency: user.hourly_rate_currency ?? "0G",
-                        specialization_id: user.specialization_id ?? [],
-                        specialties: user.specialties ?? [],
-                        stats: user.stats ?? { rating: 0, projects: 0, reviews: 0, sold: 0 },
-                        activities: user.activities ?? [],
-                    })
-                })
+                .then(user => setFetchedProfile(mapApiUserToProfile(user)))
                 .catch(err => {
                     console.error("Failed to fetch profile:", err)
                     setFetchedProfile(null)
                 })
                 .finally(() => setIsLoading(false))
         }
-    }, [mounted, isOwn, decodedAddress])
+    }, [mounted, decodedAddress])
 
     // Fetch bookmarks when entering "collections" tab
     useEffect(() => {
@@ -196,8 +208,16 @@ function ProfileContent({ params }: { params: { address: string } }) {
         }
     }, [activeTab, isOwn, isConnected])
 
-    // Use own profile data if own page, else empty data (no more Yuki fallback)
-    const displayProfile = isOwn ? profile : (fetchedProfile || {
+    // Use own editable wallet profile, but keep aggregate stats/activity from public API.
+    const ownDisplayProfile = {
+        ...profile,
+        stats: fetchedProfile?.stats ?? profile.stats,
+        activities: fetchedProfile?.activities?.length ? fetchedProfile.activities : profile.activities,
+        specialties: fetchedProfile?.specialties?.length ? fetchedProfile.specialties : profile.specialties,
+        roles: profile.roles?.length ? profile.roles : (fetchedProfile?.roles ?? []),
+    }
+
+    const displayProfile = isOwn ? ownDisplayProfile : (fetchedProfile || {
         id: 0,
         username: "",
         name: "",
@@ -270,7 +290,7 @@ function ProfileContent({ params }: { params: { address: string } }) {
     ]
 
     // Stats logic
-    const stats = displayProfile.stats || { rating: 0, projects: 0, reviews: 0, sold: 0 }
+    const stats = normalizeProfileStats(displayProfile.stats)
     const rating = stats.rating === 0 ? "—" : stats.rating.toString()
     const projects = stats.projects.toString()
     const reviews = stats.reviews.toString()

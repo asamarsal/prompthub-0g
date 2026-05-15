@@ -14,7 +14,7 @@ class ArtistReviewController extends Controller
      */
     public function index($artistId)
     {
-        $reviews = ArtistReview::with('reviewer:id,name,avatar_url')
+        $reviews = ArtistReview::with('reviewer:id,name,username,wallet_address,avatar_url')
             ->where('artist_id', $artistId)
             ->latest()
             ->paginate(10);

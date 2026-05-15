@@ -367,12 +367,16 @@ function ReviewsTab({ promptIds }: { promptIds: string[] }) {
         <div key={i} className="bg-[#0a001a] border-2 border-[#2a2a30] p-5 hover:border-[#a855f7]/50 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#ff2d95] to-[#00ffff] flex items-center justify-center text-xs font-extrabold text-white">
-                {(review.user?.name ?? review.user?.wallet_address ?? "AN").slice(0, 2).toUpperCase()}
+              <div className="w-8 h-8 bg-gradient-to-br from-[#ff2d95] to-[#00ffff] flex items-center justify-center text-xs font-extrabold text-white overflow-hidden">
+                {review.reviewer?.avatar_url ? (
+                  <img src={review.reviewer.avatar_url} alt={review.reviewer?.username || review.reviewer?.name || "Reviewer"} className="w-full h-full object-cover" />
+                ) : (
+                  (review.reviewer?.username ?? review.reviewer?.name ?? review.reviewer_address ?? "AN").slice(0, 2).toUpperCase()
+                )}
               </div>
               <div>
                 <span className="text-sm font-extrabold text-[#e0d4ff]">
-                  {review.user?.name ?? review.user?.username ?? review.user?.wallet_address?.slice(0, 8) ?? "Anonymous"}
+                  {review.reviewer?.username ? `@${review.reviewer.username}` : (review.reviewer?.name ?? review.reviewer?.wallet_address?.slice(0, 8) ?? review.reviewer_address?.slice(0, 8) ?? "Anonymous")}
                 </span>
                 <p className="text-[10px] text-[#a78bfa]/50 font-mono">
                   {new Date(review.created_at).toLocaleDateString()}

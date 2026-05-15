@@ -41,7 +41,13 @@ class DashboardController extends Controller
             )
             ->groupBy('date')
             ->orderBy('date', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'date' => $row->date,
+                    'earnings' => (float) $row->earnings,
+                ];
+            });
 
         // 3. Recent Sales
         $recentSales = Transaction::with('prompt:id,title')

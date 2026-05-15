@@ -42,6 +42,10 @@ function shortHash(value?: string | null) {
     return value.length > 20 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value
 }
 
+function normalizeAddress(value?: string | null) {
+    return (value || "").toLowerCase()
+}
+
 async function copyText(value: string, label: string) {
     if (!value) return
     await navigator.clipboard.writeText(value)
@@ -397,6 +401,10 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
 
     const handleAddReview = async () => {
         if (!prompt || newReviewRating === 0) return
+        if (currentUserReview) {
+            toast.info("You already reviewed this prompt.")
+            return
+        }
         setSubmittingReview(true)
         try {
             await submitReview(String(prompt.id), newReviewRating, newReviewComment)
@@ -449,6 +457,10 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
             setUnlockLoading(false)
         }
     }
+
+    const currentUserReview = reviews.find((review) =>
+        normalizeAddress(review.reviewer_address || review.reviewer?.wallet_address) === normalizeAddress(address)
+    )
 
     const handleDownloadAll = async () => {
         if (!prompt || !premiumContent) return
@@ -802,7 +814,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
 
                                 {activeTab === "reviews" && (
                                     <div className="flex flex-col gap-4">
-                                        {premiumContent && (
+                                        {premiumContent && !reviewsLoading && !currentUserReview && (
                                             <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#ff2d95]/50 p-4 mb-2">
                                                 <h4 className="text-sm font-bold text-[#e0d4ff] uppercase tracking-widest mb-3">Leave a Review</h4>
                                                 <div className="flex gap-2 mb-3">
@@ -828,6 +840,12 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                 </button>
                                             </div>
                                         )}
+                                        {premiumContent && !reviewsLoading && currentUserReview && (
+                                            <div className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#b4ff39]/40 p-4 mb-2">
+                                                <h4 className="text-sm font-bold text-[#b4ff39] uppercase tracking-widest">Review Submitted</h4>
+                                                <p className="mt-1 text-xs text-[#a78bfa]">You already reviewed this prompt.</p>
+                                            </div>
+                                        )}
                                         {reviewsLoading ? (
                                             <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-[#ff2d95]" /></div>
                                         ) : reviews.length > 0 ? (
@@ -835,12 +853,12 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                 <div key={review.id} className="bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-4">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-2">
-                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ff2d95] to-[#a855f7]" overflow-hidden>
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ff2d95] to-[#a855f7] overflow-hidden">
                                                                 {review.reviewer?.avatar_url && <img src={review.reviewer.avatar_url} className="w-full h-full object-cover" />}
                                                             </div>
                                                             <div>
                                                                 <p className="text-sm font-bold text-[#e0d4ff] flex items-center gap-1">
-                                                                    {review.reviewer?.name || (review.reviewer_address ? `${review.reviewer_address.slice(0, 6)}...${review.reviewer_address.slice(-4)}` : "User")}
+                                                                    {review.reviewer?.username ? `@${review.reviewer.username}` : (review.reviewer?.name || (review.reviewer_address ? `${review.reviewer_address.slice(0, 6)}...${review.reviewer_address.slice(-4)}` : "User"))}
                                                                     {review.reviewer?.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#00ffff]" />}
                                                                 </p>
                                                                 <p className="text-xs text-[#a78bfa]/50 font-mono">{new Date(review.created_at).toLocaleDateString()}</p>

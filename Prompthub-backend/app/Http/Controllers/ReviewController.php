@@ -11,7 +11,7 @@ class ReviewController extends Controller
 {
     public function index($promptId)
     {
-        $reviews = Review::with('reviewer:wallet_address,name,avatar_url')
+        $reviews = Review::with('reviewer:wallet_address,name,username,avatar_url')
             ->where('prompt_id', $promptId)
             ->latest()
             ->paginate(10);
