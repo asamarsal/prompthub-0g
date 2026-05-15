@@ -52,6 +52,52 @@ function isBytes32Hash(value?: string | null): value is string {
     return typeof value === "string" && /^0x[a-fA-F0-9]{64}$/.test(value)
 }
 
+function unlockErrorMessage(error: any) {
+    const message = String(
+        error?.shortMessage
+        || error?.reason
+        || error?.response?.data?.message
+        || error?.response?.data?.error
+        || error?.info?.error?.message
+        || error?.error?.message
+        || error?.message
+        || error
+        || ""
+    )
+    const lower = message.toLowerCase()
+
+    if (
+        lower.includes("insufficient 0g balance")
+        || lower.includes("insufficient funds")
+        || lower.includes("exceeds balance")
+        || lower.includes("not enough")
+    ) {
+        return {
+            title: "Not Enough 0G",
+            description: "Your wallet does not have enough 0G for the purchase and gas fees.",
+        }
+    }
+
+    if (lower.includes("wallet transaction was rejected") || lower.includes("user rejected") || error?.code === 4001) {
+        return {
+            title: "Transaction Rejected",
+            description: "You rejected the wallet transaction.",
+        }
+    }
+
+    if (error?.response?.status === 402 || lower.includes("402") || lower.includes("payment required")) {
+        return {
+            title: "Payment Required",
+            description: "Please complete the 0G payment to unlock this prompt.",
+        }
+    }
+
+    return {
+        title: "Unlock Failed",
+        description: message || "An unexpected error occurred. Please try again.",
+    }
+}
+
 export default function PromptDetailPageContent({ params }: { params: { id: string } }) {
     const { id } = params
     const [prompt, setPrompt] = useState<any>(null)
@@ -238,6 +284,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     additional_info: res.additional_info || [],
                     creatorName: res.user?.name || "Artist",
                     creator: res.user?.wallet_address || "0xUNKNOWN",
+                    creatorAvatar: res.user?.avatar_url || "",
                     createdAt: new Date(res.created_at).toISOString().split('T')[0],
                     isCurated: res.is_curated,
                     contract_id: res.contract_id,
@@ -393,10 +440,9 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
             })
         } catch (err: any) {
             console.error("Unlock failed:", err)
-            toast.error("Unlock Failed", {
-                description: err.message?.includes('402')
-                    ? "Please purchase this prompt first."
-                    : "An unexpected error occurred. Please try again.",
+            const friendly = unlockErrorMessage(err)
+            toast.error(friendly.title, {
+                description: friendly.description,
                 duration: 6000,
             })
         } finally {
@@ -538,8 +584,18 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                 <h3 className="text-xs font-mono font-bold text-[#a78bfa]/50 uppercase tracking-[0.2em] mb-3">Reference Gallery</h3>
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                     {prompt.referenceImages.map((image: string, idx: number) => (
-                                                        <div key={`${image}-${idx}`} className="aspect-square bg-[#160f24]/60 border-2 border-[#2a2a30] overflow-hidden">
-                                                            <img src={image} alt={`Reference ${idx + 1}`} className="w-full h-full object-cover" />
+                                                        <div
+                                                            key={`${image}-${idx}`}
+                                                            className="aspect-square bg-[#160f24]/60 border-2 border-[#2a2a30] overflow-hidden select-none"
+                                                            onContextMenu={(event) => event.preventDefault()}
+                                                        >
+                                                            <img
+                                                                src={image}
+                                                                alt={`Reference ${idx + 1}`}
+                                                                draggable={false}
+                                                                onContextMenu={(event) => event.preventDefault()}
+                                                                className="w-full h-full object-cover pointer-events-none"
+                                                            />
                                                         </div>
                                                     ))}
                                                 </div>
@@ -862,11 +918,23 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     <div className="lg:col-span-2">
                         <div className="sticky top-24">
                             <Link
-                                href={`/creator/${encodeURIComponent(prompt.creatorName)}`}
+                                href={`/creator/${encodeURIComponent(prompt.creator)}`}
                                 className="block bg-[#160f24]/60 backdrop-blur-md border-2 border-[#2a2a30] p-5 mb-4 group cursor-pointer hover:border-[#ff2d95] transition-all hover:-translate-y-1"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ff2d95] to-[#a855f7]" />
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ff2d95] to-[#a855f7] overflow-hidden flex items-center justify-center shrink-0">
+                                        {prompt.creatorAvatar ? (
+                                            <img
+                                                src={prompt.creatorAvatar}
+                                                alt={prompt.creatorName}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <span className="text-sm font-black text-white">
+                                                {String(prompt.creatorName || "A").slice(0, 1).toUpperCase()}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div>
                                         <p className="text-sm font-bold text-[#e0d4ff] flex items-center gap-1">
                                             {prompt.creatorName}
@@ -1155,51 +1223,52 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                     )}
                                 </div>
 
-                                {/* Storage references */}
-                                <div className="mt-4 pt-4 border-t border-[#2a2a30]">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <p className="text-[10px] font-display font-black text-[#a78bfa] uppercase tracking-widest">Storage Refs</p>
-                                        <span className={`text-[8px] font-black uppercase tracking-widest ${prompt.textPackageRootHash || prompt.promptTxtRootHash ? "text-[#b4ff39]" : "text-[#ff2d95]"}`}>
-                                            {prompt.textPackageRootHash || prompt.promptTxtRootHash ? "0G Ready" : "Missing"}
-                                        </span>
+                                {(isOwner || !!premiumContent) && (
+                                    <div className="mt-4 pt-4 border-t border-[#2a2a30]">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <p className="text-[10px] font-display font-black text-[#a78bfa] uppercase tracking-widest">Storage Refs</p>
+                                            <span className={`text-[8px] font-black uppercase tracking-widest ${prompt.textPackageRootHash || prompt.promptTxtRootHash ? "text-[#b4ff39]" : "text-[#ff2d95]"}`}>
+                                                {prompt.textPackageRootHash || prompt.promptTxtRootHash ? "0G Ready" : "Missing"}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            {[
+                                                ["Text Package", prompt.textPackageRootHash],
+                                                ["Prompt TXT", prompt.promptTxtRootHash],
+                                                ["Preview Image", prompt.previewRootHash],
+                                                ["Metadata IPFS", prompt.ipfsMetadataUri],
+                                            ].map(([label, value]) => (
+                                                <div key={label} className="flex items-center justify-between gap-3">
+                                                    <span className="text-[10px] text-[#a78bfa]/60 uppercase">{label}</span>
+                                                    <button
+                                                        type="button"
+                                                        disabled={!value}
+                                                        onClick={() => copyText(String(value || ""), String(label))}
+                                                        className={`max-w-[150px] truncate text-right text-[10px] font-mono transition-colors ${value ? "text-[#00ffff] hover:text-[#b4ff39] cursor-copy" : "text-[#a78bfa]/35 cursor-not-allowed"}`}
+                                                        title={String(value || "Not set")}
+                                                    >
+                                                        {shortHash(String(value || ""))}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {prompt.storageManifest && (
+                                            <p className="mt-3 text-[9px] text-[#a78bfa]/45 leading-relaxed">
+                                                Manifest includes encrypted .txt, preview image, and encrypted text package references.
+                                            </p>
+                                        )}
+                                        {prompt.storageManifest?.encryption && (
+                                            <p className="mt-2 text-[9px] font-bold text-[#b4ff39] uppercase tracking-widest">
+                                                Encrypted prompt content: {prompt.storageManifest.encryption.scheme}
+                                            </p>
+                                        )}
+                                        {!prompt.textPackageRootHash && !prompt.promptTxtRootHash && (
+                                            <p className="mt-3 text-[9px] font-bold text-[#ff2d95] uppercase tracking-widest">
+                                                Critical prompt content is not linked to 0G Storage.
+                                            </p>
+                                        )}
                                     </div>
-                                    <div className="flex flex-col gap-2">
-                                        {[
-                                            ["Text Package", prompt.textPackageRootHash],
-                                            ["Prompt TXT", prompt.promptTxtRootHash],
-                                            ["Preview Image", prompt.previewRootHash],
-                                            ["Metadata IPFS", prompt.ipfsMetadataUri],
-                                        ].map(([label, value]) => (
-                                            <div key={label} className="flex items-center justify-between gap-3">
-                                                <span className="text-[10px] text-[#a78bfa]/60 uppercase">{label}</span>
-                                                <button
-                                                    type="button"
-                                                    disabled={!value}
-                                                    onClick={() => copyText(String(value || ""), String(label))}
-                                                    className={`max-w-[150px] truncate text-right text-[10px] font-mono transition-colors ${value ? "text-[#00ffff] hover:text-[#b4ff39] cursor-copy" : "text-[#a78bfa]/35 cursor-not-allowed"}`}
-                                                    title={String(value || "Not set")}
-                                                >
-                                                    {shortHash(String(value || ""))}
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                     {prompt.storageManifest && (
-                                         <p className="mt-3 text-[9px] text-[#a78bfa]/45 leading-relaxed">
-                                             Manifest includes encrypted .txt, preview image, and encrypted text package references.
-                                         </p>
-                                     )}
-                                    {prompt.storageManifest?.encryption && (
-                                        <p className="mt-2 text-[9px] font-bold text-[#b4ff39] uppercase tracking-widest">
-                                            Encrypted prompt content: {prompt.storageManifest.encryption.scheme}
-                                        </p>
-                                    )}
-                                    {!prompt.textPackageRootHash && !prompt.promptTxtRootHash && (
-                                        <p className="mt-3 text-[9px] font-bold text-[#ff2d95] uppercase tracking-widest">
-                                            Critical prompt content is not linked to 0G Storage.
-                                        </p>
-                                    )}
-                                </div>
+                                )}
 
                                 {/* 0G Compute Quality Score */}
                                 <div className="mt-4 pt-4 border-t border-[#2a2a30]">

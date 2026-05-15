@@ -90,6 +90,47 @@ function StepIndicator({ current, onStepClick }: { current: number, onStepClick?
   )
 }
 
+function DeployingOverlay() {
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-md"
+      role="alert"
+      aria-live="assertive"
+      aria-busy="true"
+    >
+      <div className="w-[min(92vw,420px)] border-2 border-[#00ffff] bg-[#0a001a]/95 p-8 text-center shadow-[10px_10px_0_0_rgba(0,255,255,0.24)]">
+        <div className="relative mx-auto mb-6 h-28 w-28">
+          <div
+            className="absolute inset-0 rounded-full animate-spin"
+            style={{
+              background: "conic-gradient(from 0deg, #00ffff, #00b7ff, #7cf7ff, #0b5cff, #00ffff)",
+              boxShadow: "0 0 28px rgba(0,255,255,0.28), inset 0 0 18px rgba(0,183,255,0.18)",
+            }}
+          />
+          <div className="absolute inset-3 rounded-full border-2 border-[#00ffff]/20 bg-[#0a001a]" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img
+              src="/icon/0G-Logo-Purple_Hero.png"
+              alt="0G"
+              className="h-11 w-11 object-contain drop-shadow-[0_0_14px_rgba(0,255,255,0.55)]"
+              draggable={false}
+            />
+          </div>
+        </div>
+        <p className="font-display text-2xl font-black uppercase tracking-[0.18em] text-[#00ffff]">
+          Deploying to Blockchain
+        </p>
+        <p className="mt-3 text-xs font-bold uppercase tracking-widest text-[#a78bfa]">
+          Encrypting content, uploading to 0G Storage, and listing on 0G Chain.
+        </p>
+        <div className="mt-6 h-2 overflow-hidden border border-[#00ffff]/20 bg-[#071322]">
+          <div className="h-full w-2/3 animate-pulse bg-gradient-to-r from-[#00ffff] via-[#00b7ff] to-[#7cf7ff] shadow-[0_0_14px_rgba(0,255,255,0.65)]" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface FormData {
   title: string
   description: string
@@ -752,6 +793,7 @@ export default function CreatePageContent() {
       setDeployed(true)
       globalThis.localStorage.removeItem(DRAFT_KEY)
       setDraftSavedAt(null)
+      setDeploying(false)
 
     } catch (error) {
       console.error("Failed to deploy prompt:", error)
@@ -788,6 +830,7 @@ export default function CreatePageContent() {
 
   return (
     <>
+      {deploying && <DeployingOverlay />}
       <AppShell>
         <div className="mx-auto max-w-[1400px] px-4 py-10 lg:px-12">
           <p className="text-sm font-bold text-[#b4ff39] uppercase tracking-widest mb-2 font-mono">{"// CREATE"}</p>

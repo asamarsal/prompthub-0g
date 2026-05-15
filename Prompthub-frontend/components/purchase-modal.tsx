@@ -60,6 +60,11 @@ export function PurchaseModal({
 
   const creatorAddress = prompt.creator || (prompt as any).user?.wallet_address || ""
   const isSelfPurchase = !!address && !!creatorAddress && address.toLowerCase() === creatorAddress.toLowerCase()
+  const previewImage =
+    (prompt as any).watermarkedPreviewUrl ||
+    (prompt as any).preview_image_url ||
+    (prompt as any).image ||
+    ""
 
   const handleConfirm = async () => {
     if (!isConnected || !address) {
@@ -290,10 +295,20 @@ export function PurchaseModal({
             <div className="flex flex-col gap-5">
               {/* Prompt preview */}
               <div className="flex items-center gap-3 p-3 bg-[#160f24]/60 border-2 border-[#2a2a30]">
-                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#ff2d95]/20 via-[#a855f7]/15 to-[#00ffff]/20 flex items-center justify-center shrink-0 border border-[rgba(180,120,255,0.15)]">
-                  <span className="text-[#00ffff] text-sm font-bold font-mono">
-                    {prompt.category === "Image Generation" ? "IMG" : prompt.category === "Code Generation" ? "< />" : "TXT"}
-                  </span>
+                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#ff2d95]/20 via-[#a855f7]/15 to-[#00ffff]/20 flex items-center justify-center shrink-0 border border-[rgba(180,120,255,0.15)] overflow-hidden">
+                  {previewImage ? (
+                    <img
+                      src={previewImage}
+                      alt={prompt.title}
+                      draggable={false}
+                      onContextMenu={(event) => event.preventDefault()}
+                      className="w-full h-full object-cover select-none"
+                    />
+                  ) : (
+                    <span className="text-[#00ffff] text-sm font-bold font-mono">
+                      {prompt.category === "Image Generation" ? "IMG" : prompt.category === "Code Generation" ? "< />" : "TXT"}
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[#e0d4ff] truncate">{prompt.title}</p>

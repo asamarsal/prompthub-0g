@@ -88,9 +88,35 @@ function wrapAxiosWithPayment(api: AxiosInstance, account: any) {
                 throw error
             }
 
-            const marketplace = await getMarketplaceContract()
-            const tx = await marketplace.buyPrompt(contractId, { value: BigInt(amount) })
-            await tx.wait()
+            let tx: any
+            try {
+                const marketplace = await getMarketplaceContract()
+                tx = await marketplace.buyPrompt(contractId, { value: BigInt(amount) })
+                await tx.wait()
+            } catch (paymentError: any) {
+                const message = String(
+                    paymentError?.shortMessage
+                    || paymentError?.reason
+                    || paymentError?.info?.error?.message
+                    || paymentError?.error?.message
+                    || paymentError?.message
+                    || paymentError
+                )
+
+                if (
+                    message.toLowerCase().includes("insufficient funds")
+                    || message.toLowerCase().includes("exceeds balance")
+                    || message.toLowerCase().includes("not enough")
+                ) {
+                    throw new Error("Insufficient 0G balance. Add more 0G to your wallet, including extra for gas fees.")
+                }
+
+                if (message.toLowerCase().includes("user rejected") || paymentError?.code === 4001) {
+                    throw new Error("Wallet transaction was rejected.")
+                }
+
+                throw paymentError
+            }
 
             originalRequest._x402Retry = true
             originalRequest.headers = {
