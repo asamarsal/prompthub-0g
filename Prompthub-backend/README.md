@@ -44,7 +44,7 @@ PromptHub is a decentralized marketplace where creators can sell AI prompts (for
 - **On-chain verification** of purchases, escrow funding, and contest prizes
 - **0G Decentralized Storage** for prompt content with root hash tracking
 - **IPFS/Pinata** integration for preview images and metadata
-- **AI-powered prompt scoring** via 0G Compute (Llama 3.1)
+- **AI-powered prompt scoring** via 0G Compute using current 0G models
 - **AI-powered plagiarism detection** with semantic analysis
 - **AI-powered similar prompt recommendations**
 - **x402 payment protocol** middleware for content gating
@@ -66,7 +66,7 @@ PromptHub is a decentralized marketplace where creators can sell AI prompts (for
 | Blockchain | 0G Network (EVM, Chain ID 16602) |
 | Storage | 0G Decentralized Storage (Galileo testnet) |
 | IPFS | Pinata |
-| AI Inference | 0G Compute (Llama 3.1-8B-Instruct) |
+| AI Inference | 0G Compute (`0GM-1.0-35B-A3B`, fallback `deepseek/deepseek-chat-v3-0324`) |
 | Queue | Database driver |
 | Cache | Database driver |
 | Image Processing | PHP GD (watermarking) |
@@ -177,7 +177,8 @@ Copy `.env.example` to `.env` and configure:
 | **0G Compute (AI)** | |
 | `ZG_COMPUTE_API_KEY` | 0G Compute API key |
 | `ZG_COMPUTE_BASE_URL` | `https://router-api.0g.ai/v1` |
-| `ZG_COMPUTE_MODEL` | `meta-llama/Llama-3.1-8B-Instruct` |
+| `ZG_COMPUTE_MODEL` | `0GM-1.0-35B-A3B` |
+| `ZG_COMPUTE_FALLBACK_MODEL` | `deepseek/deepseek-chat-v3-0324` |
 | **WebSocket (Reverb)** | |
 | `BROADCAST_CONNECTION` | `reverb` |
 | `REVERB_APP_ID` / `REVERB_APP_KEY` / `REVERB_APP_SECRET` | Reverb credentials |

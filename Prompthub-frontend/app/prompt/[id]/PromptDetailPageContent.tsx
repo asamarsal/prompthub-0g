@@ -9,7 +9,7 @@ import { prompts as mockPrompts } from "@/lib/mock-data"
 import { ChevronRight, Check, Copy, Heart, Share2, Star, ExternalLink, Zap, Lock, BadgeCheck, Clock, Unlock, Loader2, FileText, Eye, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, getSimilarPrompts, downloadFrom0GStorage } from "@/lib/api"
+import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, generatePromptPreviewTeaser } from "@/lib/api"
 import { SimilarPrompts } from "@/components/similar-prompts"
 import { useWallet } from "@/lib/wallet-context"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
@@ -72,6 +72,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
     const [submittingReview, setSubmittingReview] = useState(false)
     const [qualityScore, setQualityScore] = useState<any>(null)
     const [scoreLoading, setScoreLoading] = useState(false)
+    const [teaserLoading, setTeaserLoading] = useState(false)
 
     const handleScorePrompt = async () => {
         if (!prompt?.id) return
@@ -84,6 +85,26 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
             toast.error("Failed to score prompt via 0G Compute")
         } finally {
             setScoreLoading(false)
+        }
+    }
+
+    const handleGenerateTeaser = async () => {
+        if (!prompt?.id) return
+        setTeaserLoading(true)
+        try {
+            const result = await generatePromptPreviewTeaser(prompt.id)
+            setPrompt((prev: any) => ({
+                ...prev,
+                previewTeaser: result.teaser,
+                previewTeaserSource: result.source,
+                previewTeaserModel: result.model || null,
+            }))
+            toast.success("Preview teaser generated")
+        } catch (e: any) {
+            console.error("Preview teaser failed:", e)
+            toast.error(e?.message || "Failed to generate preview teaser")
+        } finally {
+            setTeaserLoading(false)
         }
     }
 
@@ -128,6 +149,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     textPackageRootHash: res.text_package_root_hash || null,
                     ipfsMetadataUri: res.ipfs_metadata_uri || res.cid_ipfs || null,
                     storageManifest: res.storage_manifest || res.additional_info?.storage_manifest || null,
+                    contentSecurity: res.content_security || res.storage_manifest?.content_security || null,
                     creatorVerified: res.user?.is_verified ?? false,
                     negativePrompt: res.negative_prompt || "",
                     usageNotes: res.usage_notes || "",
@@ -135,6 +157,9 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     favoritesCount: Number(res.favorites_count || 0),
                     commercialUseAllowed: res.commercial_use_allowed ?? true,
                     referenceImages: res.reference_images || [],
+                    previewTeaser: res.preview_teaser || "",
+                    previewTeaserSource: res.preview_teaser_source || null,
+                    previewTeaserModel: res.preview_teaser_model || null,
                 })
                 setIsBookmarked(!!res.is_bookmarked)
             } catch (err) {
@@ -257,6 +282,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                     previewRootHash: res.storage_refs.preview_root_hash || prev?.previewRootHash,
                     ipfsMetadataUri: res.storage_refs.ipfs_metadata_uri || prev?.ipfsMetadataUri,
                     storageManifest: res.storage_refs.storage_manifest || prev?.storageManifest,
+                    contentSecurity: res.storage_refs.content_security || prev?.contentSecurity,
                 }))
             }
             toast.success("Content Unlocked!", {
@@ -280,10 +306,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
         if (!prompt || !premiumContent) return
 
         try {
-            const preferredRootHash = prompt.textPackageRootHash || prompt.promptTxtRootHash || prompt.rootHash
-            const blob = preferredRootHash
-                ? await downloadFrom0GStorage(preferredRootHash)
-                : new Blob([premiumContent], { type: "text/plain" })
+            const blob = new Blob([premiumContent], { type: "text/plain" })
             const url = URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
@@ -299,7 +322,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
             a.download = `prompt-${prompt.id}.txt`
             a.click()
             URL.revokeObjectURL(url)
-            toast.warning("0G Storage download unavailable, saved unlocked DB content instead.")
+            toast.warning("Saved decrypted unlocked content instead.")
         }
     }
 
@@ -507,17 +530,31 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                                             </div>
                                                                             <div className="min-w-0">
                                                                                 <p className="text-sm font-bold text-[#e0d4ff] truncate">{file.name}</p>
-                                                                                <p className="text-[10px] text-[#a78bfa]/40 font-mono">{(file.size / 1024).toFixed(1)} KB</p>
+                                                                                <p className="text-[10px] text-[#a78bfa]/40 font-mono">
+                                                                                    {(file.size / 1024).toFixed(1)} KB
+                                                                                    {file.encrypted ? " / encrypted" : ""}
+                                                                                </p>
+                                                                                {file.root_hash && (
+                                                                                    <p className="text-[9px] text-[#00ffff]/60 font-mono truncate max-w-[180px]" title={file.root_hash}>
+                                                                                        {shortHash(file.root_hash)}
+                                                                                    </p>
+                                                                                )}
                                                                             </div>
                                                                         </div>
-                                                                        <a
-                                                                            href={file.url}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                            className="p-2 hover:bg-[#b4ff39]/20 rounded-full text-[#a78bfa] hover:text-[#b4ff39] transition-all"
-                                                                        >
-                                                                            <ExternalLink className="w-4 h-4" />
-                                                                        </a>
+                                                                        {file.url ? (
+                                                                            <a
+                                                                                href={file.url}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="p-2 hover:bg-[#b4ff39]/20 rounded-full text-[#a78bfa] hover:text-[#b4ff39] transition-all"
+                                                                            >
+                                                                                <ExternalLink className="w-4 h-4" />
+                                                                            </a>
+                                                                        ) : (
+                                                                            <span className="text-[9px] font-bold text-[#b4ff39] uppercase tracking-widest">
+                                                                                0G
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -968,6 +1005,31 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                     </div>
                                 )}
 
+                                {/* AI preview teaser */}
+                                <div className="mt-4 pt-4 border-t border-[#2a2a30]">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <p className="text-[10px] font-display font-black text-[#a78bfa] uppercase tracking-widest">AI Preview Teaser</p>
+                                        {isOwner && (
+                                            <button
+                                                onClick={handleGenerateTeaser}
+                                                disabled={teaserLoading}
+                                                className="text-[10px] font-bold text-[#00ffff] hover:text-[#b4ff39] uppercase tracking-widest transition-colors disabled:opacity-50"
+                                            >
+                                                {teaserLoading ? "Generating..." : "Generate"}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-[11px] text-[#e0d4ff]/80 leading-relaxed">
+                                        {prompt.previewTeaser || "A safe buyer-facing teaser has not been generated yet."}
+                                    </p>
+                                    {(prompt.previewTeaserSource || prompt.previewTeaserModel) && (
+                                        <p className="mt-2 text-[8px] text-[#a78bfa]/35 uppercase tracking-widest">
+                                            {prompt.previewTeaserSource === "heuristic" ? "Heuristic fallback" : "0G Compute"}
+                                            {prompt.previewTeaserModel ? ` / ${prompt.previewTeaserModel}` : ""}
+                                        </p>
+                                    )}
+                                </div>
+
                                 {/* Storage references */}
                                 <div className="mt-4 pt-4 border-t border-[#2a2a30]">
                                     <div className="flex items-center justify-between mb-3">
@@ -994,9 +1056,14 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                             </div>
                                         ))}
                                     </div>
-                                    {prompt.storageManifest && (
-                                        <p className="mt-3 text-[9px] text-[#a78bfa]/45 leading-relaxed">
-                                            Manifest includes first .txt, first preview image, and text package references.
+                                     {prompt.storageManifest && (
+                                         <p className="mt-3 text-[9px] text-[#a78bfa]/45 leading-relaxed">
+                                             Manifest includes encrypted .txt, preview image, and encrypted text package references.
+                                         </p>
+                                     )}
+                                    {prompt.storageManifest?.encryption && (
+                                        <p className="mt-2 text-[9px] font-bold text-[#b4ff39] uppercase tracking-widest">
+                                            Encrypted prompt content: {prompt.storageManifest.encryption.scheme}
                                         </p>
                                     )}
                                     {!prompt.textPackageRootHash && !prompt.promptTxtRootHash && (

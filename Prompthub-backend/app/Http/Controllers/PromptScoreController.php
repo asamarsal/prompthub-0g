@@ -3,16 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prompt;
+use App\Services\PromptContentProtectionService;
+use App\Services\ZeroGComputeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 class PromptScoreController extends Controller
 {
+    public function __construct(
+        private PromptContentProtectionService $contentProtection,
+        private ZeroGComputeService $compute
+    ) {
+    }
+
     public function score(Request $request, string $id): JsonResponse
     {
         $prompt = Prompt::findOrFail($id);
-        $input = trim((string) ($request->input('prompt_text') ?: $prompt->original_content ?: $prompt->description));
+        $input = trim((string) ($request->input('prompt_text') ?: $this->contentProtection->decryptContent($prompt) ?: $prompt->description));
 
         if ($input === '') {
             return response()->json(['message' => 'No prompt content available for scoring'], 422);
@@ -43,13 +50,7 @@ class PromptScoreController extends Controller
             return $this->heuristicScore($input, 'ZG_COMPUTE_API_KEY not configured');
         }
 
-        $baseUrl = rtrim(env('ZG_COMPUTE_BASE_URL', 'https://router-api.0g.ai/v1'), '/');
-        $model = env('ZG_COMPUTE_MODEL', 'meta-llama/Llama-3.1-8B-Instruct');
-
-        $payload = [
-            'model' => $model,
-            'temperature' => 0.2,
-            'messages' => [
+        $parsed = $this->compute->chatJson([
                 [
                     'role' => 'system',
                     'content' => 'Score prompt quality in JSON only with keys: clarity, completeness, safety, reproducibility, innovation, reasoning. Scores are integers 0..10.',
@@ -58,32 +59,16 @@ class PromptScoreController extends Controller
                     'role' => 'user',
                     'content' => $input,
                 ],
-            ],
-        ];
+        ], 0.2);
 
-        try {
-            $resp = Http::timeout(20)
-                ->withToken($apiKey)
-                ->acceptJson()
-                ->post($baseUrl . '/chat/completions', $payload);
-        } catch (\Throwable $e) {
-            return $this->heuristicScore($input, '0G Compute request exception: ' . $e->getMessage());
-        }
-
-        if (!$resp->ok()) {
-            return $this->heuristicScore($input, '0G Compute request failed with status ' . $resp->status());
-        }
-
-        $content = data_get($resp->json(), 'choices.0.message.content', '');
-        $parsed = json_decode((string) $content, true);
         if (!is_array($parsed)) {
             return $this->heuristicScore($input, 'Invalid 0G Compute scorer response');
         }
 
-        return $this->normalizeScore($parsed, '0g-compute');
+        return $this->normalizeScore($parsed, '0g-compute', (string) ($parsed['_model'] ?? config('0g.compute_model')));
     }
 
-    private function normalizeScore(array $raw, string $source): array
+    private function normalizeScore(array $raw, string $source, ?string $model = null): array
     {
         $clarity = $this->clamp((int) ($raw['clarity'] ?? 0), 0, 10);
         $completeness = $this->clamp((int) ($raw['completeness'] ?? 0), 0, 10);
@@ -109,6 +94,7 @@ class PromptScoreController extends Controller
             'innovation' => $innovation,
             'reasoning' => (string) ($raw['reasoning'] ?? ''),
             'source' => $source,
+            'model' => $model,
         ];
     }
 
@@ -131,7 +117,7 @@ class PromptScoreController extends Controller
             'reproducibility' => $reproducibility,
             'innovation' => $innovation,
             'reasoning' => 'Heuristic fallback used. ' . $reason,
-        ], 'heuristic');
+        ], 'heuristic', null);
     }
 
     private function clamp(int $v, int $min, int $max): int

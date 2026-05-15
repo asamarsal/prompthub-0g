@@ -16,4 +16,9 @@ return [
     'storage_node_url' => env('OG_STORAGE_NODE_URL', 'https://storagenode-galileo.0g.ai'),
     'storage_indexer_url' => env('OG_STORAGE_INDEXER_URL', 'https://indexer-galileo.0g.ai'),
     'storage_flow_contract' => env('OG_STORAGE_FLOW_CONTRACT', ''),
+
+    // 0G Compute / Private Computer configuration
+    'compute_base_url' => env('ZG_COMPUTE_BASE_URL', 'https://router-api.0g.ai/v1'),
+    'compute_model' => env('ZG_COMPUTE_MODEL', '0GM-1.0-35B-A3B'),
+    'compute_fallback_model' => env('ZG_COMPUTE_FALLBACK_MODEL', 'deepseek/deepseek-chat-v3-0324'),
 ];

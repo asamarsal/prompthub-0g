@@ -2,6 +2,7 @@
 
 use App\Models\Prompt;
 use App\Models\User;
+use App\Services\PromptContentProtectionService;
 use App\Services\ZeroGStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -70,6 +71,68 @@ test('preview scoring endpoint returns a usable score before publish', function 
         ->assertOk()
         ->assertJsonPath('source', 'heuristic')
         ->assertJsonStructure(['overall', 'clarity', 'completeness', 'safety', 'reproducibility', 'innovation']);
+});
+
+test('compute health endpoint reports configured model without leaking secrets', function () {
+    scDisableComputeKey();
+    Sanctum::actingAs(scUser());
+
+    $this->getJson('/api/compute/health')
+        ->assertOk()
+        ->assertJsonPath('configured', false)
+        ->assertJsonPath('model', '0GM-1.0-35B-A3B')
+        ->assertJsonPath('fallback_model', 'deepseek/deepseek-chat-v3-0324')
+        ->assertJsonMissing(['api_key'])
+        ->assertJsonMissing(['ZG_COMPUTE_API_KEY']);
+});
+
+test('prompt creation encrypts premium content and client storage key at rest', function () {
+    scDisableComputeKey();
+    $user = scUser();
+    Sanctum::actingAs($user);
+
+    $secretPrompt = 'ULTRA SECRET PROMPT: use exact seed 12345 and hidden style modifiers.';
+    $response = $this->postJson('/api/prompts', [
+        'title' => 'Encrypted Prompt',
+        'description' => 'A protected prompt listing.',
+        'price_0g' => 0.01,
+        'preview_image_url' => 'https://example.test/preview.png',
+        'cid_ipfs' => 'ipfs://metadata',
+        'content_type' => 'TEXT',
+        'license_type' => 'COMMERCIAL',
+        'currency' => '0G',
+        'root_hash' => '0x' . str_repeat('a', 64),
+        'prompt_txt_root_hash' => '0x' . str_repeat('b', 64),
+        'preview_root_hash' => '0x' . str_repeat('c', 64),
+        'text_package_root_hash' => '0x' . str_repeat('d', 64),
+        'storage_status' => 'uploaded',
+        'storage_manifest' => [
+            'encryption' => [
+                'scheme' => 'AES-256-GCM',
+                'encrypted_roles' => ['prompt_txt', 'text_package'],
+            ],
+        ],
+        'content_encryption' => [
+            'scheme' => 'AES-256-GCM',
+            'key_id' => (string) Str::uuid(),
+            'key_b64' => base64_encode(random_bytes(32)),
+            'encrypted_roles' => ['prompt_txt', 'text_package'],
+        ],
+        'original_content' => $secretPrompt,
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonMissing(['original_content' => $secretPrompt])
+        ->assertJsonMissing(['encrypted_original_content']);
+
+    $prompt = Prompt::findOrFail($response->json('id'));
+
+    expect($prompt->original_content)->toBeNull()
+        ->and($prompt->encrypted_original_content)->not->toBeNull()
+        ->and($prompt->encrypted_original_content)->not->toContain($secretPrompt)
+        ->and($prompt->content_encryption_payload['key_ciphertext'] ?? null)->not->toBeNull()
+        ->and($prompt->content_encryption_payload['key_ciphertext'])->not->toBe($response->json('content_encryption.key_b64'))
+        ->and(app(PromptContentProtectionService::class)->decryptContent($prompt))->toBe($secretPrompt);
 });
 
 test('strict 0g storage upload fails instead of returning a local fallback hash', function () {

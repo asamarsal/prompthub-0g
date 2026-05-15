@@ -3,12 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prompt;
+use App\Services\PromptContentProtectionService;
+use App\Services\PromptTeaserService;
 use App\Services\X402PaymentVerifier;
 use Illuminate\Http\Request;
 
 class PromptController extends Controller
 {
-    public function __construct(private X402PaymentVerifier $x402Verifier)
+    public function __construct(
+        private X402PaymentVerifier $x402Verifier,
+        private PromptContentProtectionService $contentProtection,
+        private PromptTeaserService $teaserService
+    )
     {
     }
 
@@ -121,6 +127,7 @@ class PromptController extends Controller
                 ->where('user_id', $user->id)
                 ->exists();
         }
+        $prompt->content_security = $this->contentProtection->contentSecurityPayload($prompt);
 
         return response()->json($prompt);
     }
@@ -155,10 +162,12 @@ class PromptController extends Controller
             'currency' => 'nullable|string|in:0G,0G',
             'additional_info' => 'nullable|array',
             'original_content' => 'nullable|string',
+            'content_encryption' => 'nullable|array',
             'negative_prompt' => 'nullable|string|max:1000',
             'usage_notes' => 'nullable|string|max:1000',
             'reference_images' => 'nullable|array',
             'watermarked_preview_url' => 'nullable|string',
+            'preview_teaser' => 'nullable|string|max:500',
         ]);
         
         $validated['id'] = (string) \Illuminate\Support\Str::uuid();
@@ -172,6 +181,25 @@ class PromptController extends Controller
         $validated['storage_status'] = $validated['storage_status'] ?? (
             !empty($validated['text_package_root_hash']) && !empty($validated['preview_root_hash']) ? 'uploaded' : 'pending'
         );
+
+        $plaintextContent = trim((string) ($validated['original_content'] ?? ''));
+        if ($plaintextContent !== '') {
+            $validated['encrypted_original_content'] = $this->contentProtection->encryptedContent($plaintextContent);
+            $validated['original_content'] = null;
+        }
+
+        if (!empty($validated['content_encryption'])) {
+            $validated['content_encryption_payload'] = $this->contentProtection->protectClientEncryptionPayload($validated['content_encryption']);
+            unset($validated['content_encryption']);
+        }
+
+        if (empty($validated['preview_teaser']) && $plaintextContent !== '') {
+            $teaser = $this->teaserService->generate($validated['title'], $validated['description'], $plaintextContent);
+            $validated['preview_teaser'] = $teaser['teaser'];
+            $validated['preview_teaser_source'] = $teaser['source'];
+            $validated['preview_teaser_model'] = $teaser['model'] ?? null;
+            $validated['preview_teaser_generated_at'] = now();
+        }
         
         $prompt = Prompt::create($validated);
 
@@ -215,12 +243,13 @@ class PromptController extends Controller
                 'prompt_id' => $prompt->id,
                 'contract_token_id' => $verification['tokenId'],
                 'buyer_address' => $verification['buyer'],
-                'original_content' => $prompt->original_content ?? 'Sample prompt content for demonstration.',
+                'original_content' => $this->premiumContent($prompt),
                 'negative_prompt' => $prompt->negative_prompt,
                 'usage_notes' => $prompt->usage_notes,
                 'root_hash' => $prompt->root_hash,
                 'storage_refs' => $this->storageRefsPayload($prompt),
-                'content_hash' => $prompt->original_content ? hash('sha256', $prompt->original_content) : null,
+                'content_hash' => $this->contentHash($prompt),
+                'content_security' => $this->contentProtection->contentSecurityPayload($prompt),
             ]);
         } catch (\Exception $e) {
             \Log::error("Exception in verifyPurchase: " . $e->getMessage());
@@ -280,12 +309,55 @@ class PromptController extends Controller
 
         return response()->json([
             'id' => $prompt->id,
-            'original_content' => $prompt->original_content ?? 'This is the premium prompt content protected by purchase verification.',
+            'original_content' => $this->premiumContent($prompt),
             'negative_prompt' => $prompt->negative_prompt,
             'usage_notes' => $prompt->usage_notes,
             'root_hash' => $prompt->root_hash,
             'storage_refs' => $this->storageRefsPayload($prompt),
-            'content_hash' => $prompt->original_content ? hash('sha256', $prompt->original_content) : null,
+            'content_hash' => $this->contentHash($prompt),
+            'content_security' => $this->contentProtection->contentSecurityPayload($prompt),
+        ]);
+    }
+
+    public function previewTeaser($id)
+    {
+        $prompt = Prompt::findOrFail($id);
+
+        return response()->json([
+            'prompt_id' => $prompt->id,
+            'teaser' => $prompt->preview_teaser ?: $this->teaserService->generate($prompt->title, $prompt->description, null)['teaser'],
+            'source' => $prompt->preview_teaser_source ?: 'heuristic',
+            'model' => $prompt->preview_teaser_model,
+            'generated_at' => $prompt->preview_teaser_generated_at,
+        ]);
+    }
+
+    public function generatePreviewTeaser(Request $request, $id)
+    {
+        $prompt = Prompt::findOrFail($id);
+        if ($request->user()->id !== $prompt->user_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $teaser = $this->teaserService->generate(
+            $prompt->title,
+            $prompt->description,
+            $this->contentProtection->decryptContent($prompt)
+        );
+
+        $prompt->update([
+            'preview_teaser' => $teaser['teaser'],
+            'preview_teaser_source' => $teaser['source'],
+            'preview_teaser_model' => $teaser['model'] ?? null,
+            'preview_teaser_generated_at' => now(),
+        ]);
+
+        return response()->json([
+            'prompt_id' => $prompt->id,
+            'teaser' => $prompt->preview_teaser,
+            'source' => $prompt->preview_teaser_source,
+            'model' => $prompt->preview_teaser_model,
+            'generated_at' => $prompt->preview_teaser_generated_at,
         ]);
     }
 
@@ -399,6 +471,19 @@ class PromptController extends Controller
             'ipfs_metadata_uri' => $prompt->ipfs_metadata_uri ?? $prompt->cid_ipfs,
             'storage_manifest' => $prompt->storage_manifest,
             'storage_status' => $prompt->storage_status,
+            'content_security' => $this->contentProtection->contentSecurityPayload($prompt),
         ];
+    }
+
+    private function premiumContent(Prompt $prompt): string
+    {
+        return $this->contentProtection->decryptContent($prompt)
+            ?? 'Premium content is unavailable. Please contact support with this prompt ID.';
+    }
+
+    private function contentHash(Prompt $prompt): ?string
+    {
+        $content = $this->contentProtection->decryptContent($prompt);
+        return $content ? hash('sha256', $content) : null;
     }
 }

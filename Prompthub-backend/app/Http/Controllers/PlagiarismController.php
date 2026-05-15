@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prompt;
+use App\Services\ZeroGComputeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class PlagiarismController extends Controller
 {
+    public function __construct(private ZeroGComputeService $compute)
+    {
+    }
+
     /**
      * POST /api/prompts/check-plagiarism
      * Checks if a new prompt's content is too similar to existing prompts.
@@ -90,6 +94,8 @@ class PlagiarismController extends Controller
             'similarity_score' => round($similarityScore, 2),
             'reasoning' => $reasoning,
             'similar_prompts' => array_slice($similarPrompts, 0, 5),
+            'source' => $aiResult ? '0g-compute' : 'database-fallback',
+            'model' => $aiResult['model'] ?? null,
         ]);
     }
 
@@ -135,9 +141,6 @@ class PlagiarismController extends Controller
         }
 
         try {
-            $baseUrl = rtrim(env('ZG_COMPUTE_BASE_URL', 'https://router-api.0g.ai/v1'), '/');
-            $model = env('ZG_COMPUTE_MODEL', 'meta-llama/Llama-3.1-8B-Instruct');
-
             // Get existing prompts to compare against
             $existingPrompts = Prompt::where('is_published', true)
                 ->select('id', 'title', 'description')
@@ -164,10 +167,7 @@ class PlagiarismController extends Controller
                 $newPromptText .= "\nContent: \"" . \Illuminate\Support\Str::limit($content, 300) . "\"";
             }
 
-            $payload = [
-                'model' => $model,
-                'temperature' => 0.1,
-                'messages' => [
+            $parsed = $this->compute->chatJson([
                     [
                         'role' => 'system',
                         'content' => 'You are a plagiarism detector for an AI prompt marketplace. Compare a NEW prompt against EXISTING prompts. Return ONLY valid JSON with these keys: is_plagiarized (bool), similarity_score (float 0.0-1.0), reasoning (string, 1-2 sentences), similar_ids (array of matching prompt IDs from the list, empty if none). A prompt is plagiarized if it is substantially the same idea with minor rewording (score >= 0.7).',
@@ -176,24 +176,10 @@ class PlagiarismController extends Controller
                         'role' => 'user',
                         'content' => "NEW PROMPT:\n{$newPromptText}\n\nEXISTING PROMPTS:\n{$existingList}",
                     ],
-                ],
-            ];
-
-            $resp = Http::timeout(20)
-                ->withToken($apiKey)
-                ->acceptJson()
-                ->post($baseUrl . '/chat/completions', $payload);
-
-            if (!$resp->ok()) {
-                Log::warning('Plagiarism AI check failed: HTTP ' . $resp->status());
-                return null;
-            }
-
-            $raw = data_get($resp->json(), 'choices.0.message.content', '');
-            $parsed = json_decode(trim($raw), true);
+            ], 0.1);
 
             if (!is_array($parsed)) {
-                Log::warning('Plagiarism AI returned invalid JSON: ' . $raw);
+                Log::warning('Plagiarism AI returned invalid JSON.');
                 return null;
             }
 
@@ -202,6 +188,7 @@ class PlagiarismController extends Controller
                 'similarity_score' => (float) min(1.0, max(0.0, $parsed['similarity_score'] ?? 0.0)),
                 'reasoning' => (string) ($parsed['reasoning'] ?? ''),
                 'similar_ids' => is_array($parsed['similar_ids'] ?? null) ? $parsed['similar_ids'] : [],
+                'model' => (string) ($parsed['_model'] ?? config('0g.compute_model')),
             ];
         } catch (\Throwable $e) {
             Log::warning('Plagiarism AI check exception: ' . $e->getMessage());

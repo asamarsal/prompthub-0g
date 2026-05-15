@@ -15,6 +15,7 @@ import {
   type ApiCategory,
 } from "@/lib/api"
 import { uploadTo0GStorageNetwork, getStorageTxExplorerUrl } from "@/lib/zero-g-storage"
+import { createPromptEncryptionContext, encryptFileFor0G } from "@/lib/prompt-encryption"
 import { useWallet } from "@/lib/wallet-context"
 import { parseEther } from "ethers"
 import { getMarketplaceContract } from "@/lib/evm"
@@ -372,23 +373,22 @@ export default function CreatePageContent() {
         watermarkedPreviewUrl = (previewRes as any).watermarked_url || ""
       }
 
-      // 1. Upload prompt files to backend (local cache) + extract text
-      console.log("Uploading prompt files to backend cache...")
-      const uploadedFiles: { name: string, url: string, size: number, type: string, root_hash?: string }[] = []
+      // 1. Read prompt files locally. Raw prompt content is never uploaded to backend cache.
+      console.log("Preparing prompt files for encrypted 0G upload...")
+      const uploadedFiles: { name: string, url?: string, size: number, type: string, root_hash?: string, encrypted?: boolean }[] = []
       let combinedContent = ""
 
       for (let i = 0; i < promptFiles.length; i++) {
         const f = promptFiles[i]
-        const uploadRes = await uploadPromptAsset(f, groupId)
         uploadedFiles.push({
           name: f.name,
-          url: uploadRes.url,
           size: f.size,
           type: f.type,
+          encrypted: true,
         })
 
-        // Extract text for text-based files to store in DB
-        if ((form.contentType === "TEXT" || form.contentType === "CODE") && combinedContent.length < 5000) {
+        // Extract text locally for encrypted-at-rest backend unlock and AI checks.
+        if ((form.contentType === "TEXT" || form.contentType === "CODE") && combinedContent.length < 200000) {
           try {
             const text = await f.text()
             combinedContent += `--- FILE: ${f.name} ---\n${text}\n\n`
@@ -419,11 +419,14 @@ export default function CreatePageContent() {
 
       // 2. Upload FIRST prompt file to 0G Storage Network (decentralized)
       // Uses official 0G TypeScript SDK — creates on-chain tx to Flow contract
+      const encryptionContext = await createPromptEncryptionContext()
       let storageRootHash = ""
       let storageTxHash = ""
-      console.log("Uploading to 0G Storage Network via SDK...")
+      let encryptedPromptTxt: Awaited<ReturnType<typeof encryptFileFor0G>> | null = null
+      console.log("Encrypting and uploading prompt .txt to 0G Storage Network via SDK...")
       try {
-        const zgResult = await uploadTo0GStorageNetwork(firstTxtFile)
+        encryptedPromptTxt = await encryptFileFor0G(firstTxtFile, encryptionContext)
+        const zgResult = await uploadTo0GStorageNetwork(encryptedPromptTxt.file)
         if (zgResult.success && zgResult.rootHash) {
           storageRootHash = zgResult.rootHash
           storageTxHash = zgResult.txHash
@@ -470,17 +473,54 @@ export default function CreatePageContent() {
           tx_hash: result.txHash || "",
         }
       }
+      const uploadEncryptedRequired0G = async (file: File, role: "text_package") => {
+        const encrypted = await encryptFileFor0G(file, encryptionContext)
+        const result = await uploadTo0GStorageNetwork(encrypted.file)
+        if (!result.success || !result.rootHash) {
+          throw new Error(`0G Storage upload failed for encrypted ${role}: ${result.error || "missing root hash"}`)
+        }
+        return {
+          role,
+          name: file.name,
+          encrypted_name: encrypted.file.name,
+          mime_type: file.type || "application/octet-stream",
+          stored_mime_type: encrypted.file.type,
+          size: encrypted.file.size,
+          plaintext_size: file.size,
+          root_hash: result.rootHash,
+          tx_hash: result.txHash || "",
+          encrypted: true,
+          encryption: {
+            scheme: encryptionContext.scheme,
+            key_id: encryptionContext.keyId,
+            iv_b64: encrypted.ivB64,
+            plaintext_sha256: encrypted.plaintextSha256,
+            ciphertext_sha256: encrypted.ciphertextSha256,
+          },
+        }
+      }
 
       const promptTxtRef = {
         role: "prompt_txt",
         name: firstTxtFile.name,
+        encrypted_name: encryptedPromptTxt?.file.name || `${firstTxtFile.name}.enc`,
         mime_type: firstTxtFile.type || "text/plain",
-        size: firstTxtFile.size,
+        stored_mime_type: encryptedPromptTxt?.file.type || "application/octet-stream",
+        size: encryptedPromptTxt?.file.size || firstTxtFile.size,
+        plaintext_size: firstTxtFile.size,
         root_hash: storageRootHash,
         tx_hash: storageTxHash || "",
+        encrypted: true,
+        encryption: {
+          scheme: encryptionContext.scheme,
+          key_id: encryptionContext.keyId,
+          iv_b64: encryptedPromptTxt?.ivB64 || "",
+          plaintext_sha256: encryptedPromptTxt?.plaintextSha256 || "",
+          ciphertext_sha256: encryptedPromptTxt?.ciphertextSha256 || "",
+        },
       }
       const previewImageRef = await uploadRequired0G(form.previewImageFile, "preview_image")
-      const textPackageRef = await uploadRequired0G(textPackageFile, "text_package")
+      const textPackageRef = await uploadEncryptedRequired0G(textPackageFile, "text_package")
       const zeroGFiles = [promptTxtRef, previewImageRef, textPackageRef]
       const finalStorageHash = textPackageRef.root_hash || promptTxtRef.root_hash
       const finalStorageTxHash = textPackageRef.tx_hash || promptTxtRef.tx_hash
@@ -491,13 +531,17 @@ export default function CreatePageContent() {
         creator: address || "",
         created_at: new Date().toISOString(),
         pinata_policy: "text_metadata_only",
+        encryption: {
+          scheme: encryptionContext.scheme,
+          key_id: encryptionContext.keyId,
+          encrypted_roles: ["prompt_txt", "text_package"],
+          key_custody: "backend-laravel-crypt",
+        },
         zero_g_files: zeroGFiles,
         negative_prompt: form.negativePrompt,
         usage_notes: form.usageNotes,
         commercial_use_allowed: form.commercialUseAllowed,
       }
-
-      const promptUrl = uploadedFiles.length > 0 ? uploadedFiles[0].url : ""
 
       // 3. Upload NFT Metadata to IPFS (Pinata)
       const metadataRes = await uploadMetadata({
@@ -508,7 +552,6 @@ export default function CreatePageContent() {
           category: form.category,
           model: form.model,
           content_type: form.contentType,
-          prompt_url: promptUrl,
           files: uploadedFiles,
           license: form.license,
           royalty: form.royalty,
@@ -520,6 +563,7 @@ export default function CreatePageContent() {
           creator_address: address || "",
           storage_root_hash: finalStorageHash,
           storage_manifest: storageManifest,
+          encryption: storageManifest.encryption,
           pinata_policy: "text_metadata_only",
           zero_g_files: zeroGFiles,
           prompt_txt_root_hash: promptTxtRef.root_hash,
@@ -601,6 +645,12 @@ export default function CreatePageContent() {
         ipfs_metadata_uri: metadataCID,
         storage_manifest: storageManifest,
         storage_status: "uploaded",
+        content_encryption: {
+          scheme: encryptionContext.scheme,
+          key_id: encryptionContext.keyId,
+          key_b64: encryptionContext.keyB64,
+          encrypted_roles: ["prompt_txt", "text_package"],
+        },
         reference_images: refImageUrls,
         negative_prompt: form.negativePrompt.trim() || null,
         usage_notes: form.usageNotes.trim() || null,

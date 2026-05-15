@@ -17,6 +17,7 @@ use App\Http\Controllers\StorageController;
 use App\Http\Controllers\PromptScoreController;
 use App\Http\Controllers\PromptRecommendationController;
 use App\Http\Controllers\PlagiarismController;
+use App\Http\Controllers\ComputeHealthController;
 
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\ArtistReviewController;
@@ -39,6 +40,7 @@ Route::get('/artists/{id}/reviews', [ArtistReviewController::class, 'index']);
 Route::get('/prompts/{id}/reviews', [ReviewController::class, 'index']);
 Route::get('/prompts/{id}/transactions', [TransactionController::class, 'promptHistory']);
 Route::get('/prompts/{id}/similar', [PromptRecommendationController::class, 'similar']);
+Route::get('/prompts/{id}/preview-teaser', [PromptController::class, 'previewTeaser'])->whereUuid('id');
 Route::post('/prompts/check-plagiarism', [PlagiarismController::class, 'check']);
 
 // Protected routes (requires Sanctum token)
@@ -82,6 +84,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/prompts/{id}/storage-refs', [PromptController::class, 'storageRefs'])->middleware('x402');
     Route::post('/prompts/{id}/score', [PromptScoreController::class, 'score']);
     Route::post('/prompts/preview-score', [PromptScoreController::class, 'preview']);
+    Route::post('/prompts/{id}/preview-teaser', [PromptController::class, 'generatePreviewTeaser'])->whereUuid('id');
 
     // Contests
     Route::post('/contests', [ContestController::class, 'store']);
@@ -116,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/compute/health', [ComputeHealthController::class, 'show']);
 
     // Bookmarks
     Route::get('/users/me/bookmarks', [BookmarkController::class, 'index']);

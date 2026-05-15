@@ -618,6 +618,7 @@ export async function scorePrompt(id: string, promptText?: string): Promise<{
     innovation: number
     reasoning: string
     source?: "0g-compute" | "heuristic"
+    model?: string | null
 }> {
     return request(`/api/prompts/${id}/score`, {
         method: "POST",
@@ -634,10 +635,31 @@ export async function previewPromptScore(promptText: string): Promise<{
     innovation: number
     reasoning: string
     source?: "0g-compute" | "heuristic"
+    model?: string | null
 }> {
     return request("/api/prompts/preview-score", {
         method: "POST",
         body: JSON.stringify({ prompt_text: promptText }),
+    })
+}
+
+export async function getPromptPreviewTeaser(id: string | number): Promise<{
+    teaser: string
+    source: "0g-compute" | "heuristic"
+    model?: string | null
+    generated_at?: string | null
+}> {
+    return request(`/api/prompts/${id}/preview-teaser`)
+}
+
+export async function generatePromptPreviewTeaser(id: string | number): Promise<{
+    teaser: string
+    source: "0g-compute" | "heuristic"
+    model?: string | null
+    generated_at?: string | null
+}> {
+    return request(`/api/prompts/${id}/preview-teaser`, {
+        method: "POST",
     })
 }
 
@@ -724,6 +746,8 @@ export interface PlagiarismResult {
     is_plagiarized: boolean
     similarity_score: number
     reasoning: string
+    source?: "0g-compute" | "database-fallback"
+    model?: string | null
     similar_prompts: {
         id: string
         title: string

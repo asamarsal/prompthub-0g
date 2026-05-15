@@ -28,6 +28,12 @@ class Prompt extends Model
         'is_curated',
         'total_sold',
         'original_content',
+        'encrypted_original_content',
+        'content_encryption_payload',
+        'preview_teaser',
+        'preview_teaser_source',
+        'preview_teaser_model',
+        'preview_teaser_generated_at',
         'negative_prompt',
         'usage_notes',
         'view_count',
@@ -52,6 +58,12 @@ class Prompt extends Model
         'commercial_use_allowed'
     ];
 
+    protected $hidden = [
+        'original_content',
+        'encrypted_original_content',
+        'content_encryption_payload',
+    ];
+
     protected $casts = [
         'tags' => 'array',
         'price_0g' => 'decimal:6',
@@ -63,8 +75,10 @@ class Prompt extends Model
         'view_count' => 'integer',
         'contract_id' => 'integer',
         'storage_manifest' => 'array',
+        'content_encryption_payload' => 'array',
         'ai_quality_score' => 'array',
         'ai_quality_score_updated_at' => 'datetime',
+        'preview_teaser_generated_at' => 'datetime',
         'additional_info' => 'array',
         'reference_images' => 'array',
         'commercial_use_allowed' => 'boolean'

@@ -23,7 +23,7 @@ class AiModelSeeder extends Seeder
                 ['name' => 'Claude 3 Opus', 'slug' => 'claude-3-opus'],
                 ['name' => 'Gemini 1.5 Pro', 'slug' => 'gemini-1-5-pro'],
                 ['name' => 'Gemini 1.5 Flash', 'slug' => 'gemini-1-5-flash'],
-                ['name' => 'Llama 3.1', 'slug' => 'llama-3-1'],
+                ['name' => '0GM-1.0-35B-A3B', 'slug' => '0gm-1-0-35b-a3b'],
                 ['name' => 'Mistral Large', 'slug' => 'mistral-large'],
                 ['name' => 'Grok-2', 'slug' => 'grok-2'],
                 ['name' => 'DeepSeek-V3', 'slug' => 'deepseek-v3'],
