@@ -9,7 +9,7 @@ class MessageController extends Controller
 {
     public function index(Request $request)
     {
-        $address = $request->user()->stx_address ?? '0x0000000000000000000000000000000000000000';
+        $address = $request->user()->wallet_address ?? '0x0000000000000000000000000000000000000000';
         $messages = Message::where('sender_address', $address)
             ->orWhere('receiver_address', $address)
             ->orderBy('created_at', 'desc')
@@ -39,7 +39,7 @@ class MessageController extends Controller
 
     public function history(Request $request, $otherAddress)
     {
-        $address = $request->user()->stx_address ?? '0x0000000000000000000000000000000000000000';
+        $address = $request->user()->wallet_address ?? '0x0000000000000000000000000000000000000000';
         $messages = Message::where(function($q) use ($address, $otherAddress) {
                 $q->where('sender_address', $address)->where('receiver_address', $otherAddress);
             })->orWhere(function($q) use ($address, $otherAddress) {
@@ -58,7 +58,7 @@ class MessageController extends Controller
             'attachment_url' => 'nullable|string',
         ]);
         
-        $sender_address = $request->user()->stx_address ?? '0x0000000000000000000000000000000000000000';
+        $sender_address = $request->user()->wallet_address ?? '0x0000000000000000000000000000000000000000';
         $receiver_address = $validated['receiver_address'];
 
         // Check connection
@@ -84,10 +84,12 @@ class MessageController extends Controller
         $senderName = $sender->username ? '@' . $sender->username : ($sender->name ?? 'someone');
         $notification = \App\Models\Notification::create([
             'user_address' => $receiver_address,
-            'title' => 'New Message',
-            'message' => '1 unread message from ' . $senderName,
             'type' => 'message',
-            'link' => '/messages'
+            'data' => [
+                'title' => 'New Message',
+                'message' => '1 unread message from ' . $senderName,
+                'link' => '/messages',
+            ],
         ]);
         broadcast(new \App\Events\NotificationSent($notification));
 
@@ -100,7 +102,7 @@ class MessageController extends Controller
             'receiver_address' => 'required|string',
         ]);
         
-        $sender_address = $request->user()->stx_address ?? '0x0000000000000000000000000000000000000000';
+        $sender_address = $request->user()->wallet_address ?? '0x0000000000000000000000000000000000000000';
         broadcast(new \App\Events\Typing($sender_address, $request->receiver_address));
         
         return response()->json(['status' => 'typing sent']);
@@ -112,7 +114,7 @@ class MessageController extends Controller
             'sender_address' => 'required|string',
         ]);
         
-        $receiver_address = $request->user()->stx_address ?? '0x0000000000000000000000000000000000000000';
+        $receiver_address = $request->user()->wallet_address ?? '0x0000000000000000000000000000000000000000';
         
         Message::where('sender_address', $request->sender_address)
             ->where('receiver_address', $receiver_address)
@@ -127,7 +129,7 @@ class MessageController extends Controller
 
     public function read(Request $request, $id)
     {
-        $receiver_address = $request->user()->stx_address ?? '0x0000000000000000000000000000000000000000';
+        $receiver_address = $request->user()->wallet_address ?? '0x0000000000000000000000000000000000000000';
         
         $msg = Message::find($id);
         if ($msg && $msg->receiver_address === $receiver_address && !$msg->is_read) {

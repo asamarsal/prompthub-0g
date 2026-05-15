@@ -18,7 +18,7 @@ class ConnectionController extends Controller
 
         $connections = Connection::where('requester_address', $address)
             ->orWhere('recipient_address', $address)
-            ->with(['requester:wallet_address,name,avatar_url', 'recipient:wallet_address,name,avatar_url'])
+            ->with(['requester:wallet_address,name,username,avatar_url', 'recipient:wallet_address,name,username,avatar_url'])
             ->get();
 
         return response()->json($connections);
@@ -61,10 +61,12 @@ class ConnectionController extends Controller
 
         $notification = \App\Models\Notification::create([
             'user_address' => $recipient_address,
-            'title' => 'New Friend Request',
-            'message' => 'You have a new friend request from ' . ($request->user()->name ?? 'a user') . '.',
             'type' => 'friend_request',
-            'link' => '/messages'
+            'data' => [
+                'title' => 'New Friend Request',
+                'message' => 'You have a new friend request from ' . ($request->user()->name ?? 'a user') . '.',
+                'link' => '/messages',
+            ],
         ]);
         
         broadcast(new \App\Events\NotificationSent($notification));

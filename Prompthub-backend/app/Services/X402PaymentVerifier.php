@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Events\NotificationSent;
+use App\Models\Notification;
 use App\Models\Prompt;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class X402PaymentVerifier
 {
@@ -122,7 +125,47 @@ class X402PaymentVerifier
             'verification_source' => $source,
         ]);
 
+        $prompt->increment('total_sold');
+        $this->notifySeller($prompt, $transaction);
+
         return ['valid' => true, 'transaction' => $transaction, 'reused' => false];
+    }
+
+    private function notifySeller(Prompt $prompt, Transaction $transaction): void
+    {
+        try {
+            $prompt->loadMissing('user');
+
+            $sellerAddress = $this->normalizeAddress((string) ($prompt->user?->wallet_address ?? $transaction->seller_address ?? ''));
+            $buyerAddress = $this->normalizeAddress((string) $transaction->buyer_address);
+
+            if (!$sellerAddress || $sellerAddress === $buyerAddress) {
+                return;
+            }
+
+            $notification = Notification::create([
+                'user_address' => $sellerAddress,
+                'type' => 'purchase',
+                'data' => [
+                    'title' => 'New Sale!',
+                    'message' => 'Someone purchased "' . $prompt->title . '" for ' . $transaction->amount_paid . ' ' . ($transaction->currency ?? '0G') . '.',
+                    'link' => '/dashboard',
+                    'prompt_id' => (string) $prompt->id,
+                    'prompt_title' => $prompt->title,
+                    'buyer_address' => $buyerAddress,
+                    'tx_id' => $transaction->tx_id,
+                    'amount_paid' => (string) $transaction->amount_paid,
+                    'currency' => $transaction->currency ?? '0G',
+                ],
+            ]);
+
+            broadcast(new NotificationSent($notification));
+        } catch (\Throwable $e) {
+            Log::warning('Purchase notification failed: ' . $e->getMessage(), [
+                'prompt_id' => $prompt->id,
+                'tx_id' => $transaction->tx_id,
+            ]);
+        }
     }
 
     public function normalizeTxHash(string $txId): ?string

@@ -39,6 +39,11 @@ function MessagesContent() {
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
 
+    const normalizeAddress = (value?: string | null) => (value || "").toLowerCase();
+    const shortAddress = (value?: string | null) => value ? `${value.slice(0, 8)}...${value.slice(-4)}` : "Unknown";
+    const displayUserName = (user: any, fallbackAddress?: string | null) =>
+        user?.username ? `@${user.username}` : (user?.name || shortAddress(fallbackAddress || user?.wallet_address));
+
     // Load initial data
     useEffect(() => {
         if (isConnected && address) {
@@ -54,7 +59,7 @@ function MessagesContent() {
         // Try to handle direct address or username
         const handleDeepLink = async () => {
             // 1. Is it a 0G address?
-            if (toParam.startsWith('S') && toParam.length > 30) {
+            if (/^0x[a-fA-F0-9]{40}$/.test(toParam)) {
                 try {
                     const user = await fetchUserByAddress(toParam);
                     if (user) setSelectedUser(user);
@@ -98,14 +103,17 @@ function MessagesContent() {
         const channel = echo.private(`chat.${address}`);
         channel.listen('MessageSent', (e: any) => {
             // Append if it's from the selected user
-            if (e.message.sender_address === selectedUser.wallet_address) {
+            if (normalizeAddress(e.message.sender_address) === normalizeAddress(selectedUser.wallet_address)) {
                 setMessages(prev => [...prev, e.message]);
                 setOtherIsTyping(false); // Clear typing indicator
             }
 
             // Update conversations list summary
             setConversations(prev => {
-                const existing = prev.find(c => c.sender_address === e.message.sender_address || c.receiver_address === e.message.sender_address);
+                const existing = prev.find(c =>
+                    normalizeAddress(c.sender_address) === normalizeAddress(e.message.sender_address)
+                    || normalizeAddress(c.receiver_address) === normalizeAddress(e.message.sender_address)
+                );
                 if (existing) {
                     return prev.map(c => c.id === existing.id ? { ...e.message, unread_count: (existing.unread_count || 0) + 1 } : c);
                 }
@@ -117,7 +125,7 @@ function MessagesContent() {
         });
 
         channel.listen('Typing', (e: any) => {
-            if (e.sender_address === selectedUser.wallet_address) {
+            if (normalizeAddress(e.sender_address) === normalizeAddress(selectedUser.wallet_address)) {
                 setOtherIsTyping(true);
                 if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
                 typingTimeoutRef.current = setTimeout(() => setOtherIsTyping(false), 3000);
@@ -125,9 +133,9 @@ function MessagesContent() {
         });
 
         channel.listen('MessageRead', (e: any) => {
-            if (e.message_id === 'all' && e.sender_address === address && e.receiver_address === selectedUser.wallet_address) {
+            if (e.message_id === 'all' && normalizeAddress(e.sender_address) === normalizeAddress(address) && normalizeAddress(e.receiver_address) === normalizeAddress(selectedUser.wallet_address)) {
                 setMessages(prev => prev.map(m => ({ ...m, is_read: true })));
-            } else if (e.sender_address === address && e.receiver_address === selectedUser.wallet_address) {
+            } else if (normalizeAddress(e.sender_address) === normalizeAddress(address) && normalizeAddress(e.receiver_address) === normalizeAddress(selectedUser.wallet_address)) {
                 setMessages(prev => prev.map(m => m.id === e.message_id ? { ...m, is_read: true } : m));
             }
         });
@@ -183,15 +191,16 @@ function MessagesContent() {
             setMessages(prev => prev.map(m => m.id === tempMsg.id ? savedMsg : m));
 
             setConversations(prev => {
-                const others = prev.filter(c => c.sender_address !== selectedUser.wallet_address && c.receiver_address !== selectedUser.wallet_address);
+                const others = prev.filter(c =>
+                    normalizeAddress(c.sender_address) !== normalizeAddress(selectedUser.wallet_address)
+                    && normalizeAddress(c.receiver_address) !== normalizeAddress(selectedUser.wallet_address)
+                );
                 return [savedMsg, ...others];
             });
         } catch (err: any) {
             console.error(err);
             setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
-            if (err.message && err.message.includes("403")) {
-                alert("You are not friends with this user.");
-            }
+            alert(err?.message?.includes("403") ? "You are not friends with this user yet." : "Failed to send message. Please try again.");
         }
     };
 
@@ -241,11 +250,16 @@ function MessagesContent() {
 
     // Connection helpers
     const getConnectionStatus = (otherAddress: string) => {
-        const conn = connections.find(c => c.requester_address === otherAddress || c.recipient_address === otherAddress);
+        const other = normalizeAddress(otherAddress);
+        const me = normalizeAddress(address);
+        const conn = connections.find(c =>
+            (normalizeAddress(c.requester_address) === other && normalizeAddress(c.recipient_address) === me)
+            || (normalizeAddress(c.recipient_address) === other && normalizeAddress(c.requester_address) === me)
+        );
         if (!conn) return null;
         return {
             status: conn.status,
-            isRequester: conn.requester_address === address,
+            isRequester: normalizeAddress(conn.requester_address) === me,
             id: conn.id,
         };
     };
@@ -272,7 +286,64 @@ function MessagesContent() {
     const currentConnection = selectedUser ? getConnectionStatus(selectedUser.wallet_address) : null;
     const isFriend = currentConnection?.status === "accepted";
 
-    const pendingRequests = connections.filter(c => c.status === "pending" && c.recipient_address === address);
+    const pendingRequests = connections.filter(c => c.status === "pending" && normalizeAddress(c.recipient_address) === normalizeAddress(address));
+    const acceptedFriends = connections
+        .filter(c => c.status === "accepted")
+        .map(c => {
+            const requesterIsMe = normalizeAddress(c.requester_address) === normalizeAddress(address);
+            return {
+                connectionId: c.id,
+                wallet_address: requesterIsMe ? c.recipient_address : c.requester_address,
+                user: requesterIsMe ? c.recipient : c.requester,
+            };
+        })
+        .filter(friend => friend.wallet_address && normalizeAddress(friend.wallet_address) !== normalizeAddress(address));
+
+    const chatEntries = (() => {
+        const seen = new Set<string>();
+        const entries: any[] = [];
+        const friendByAddress = new Map(
+            acceptedFriends.map(friend => [normalizeAddress(friend.wallet_address), friend])
+        );
+
+        for (const conv of conversations) {
+            const otherAddress = normalizeAddress(conv.sender_address) === normalizeAddress(address)
+                ? conv.receiver_address
+                : conv.sender_address;
+            if (!otherAddress) continue;
+            const friend = friendByAddress.get(normalizeAddress(otherAddress));
+            seen.add(normalizeAddress(otherAddress));
+            entries.push({
+                type: "conversation",
+                key: `conversation-${otherAddress}`,
+                address: otherAddress,
+                name: friend ? displayUserName(friend.user, otherAddress) : shortAddress(otherAddress),
+                username: friend?.user?.username || "",
+                avatar_url: friend?.user?.avatar_url || "",
+                content: conv.content,
+                created_at: conv.created_at,
+                unread_count: conv.unread_count || 0,
+                conversation: conv,
+            });
+        }
+
+        for (const friend of acceptedFriends) {
+            if (seen.has(normalizeAddress(friend.wallet_address))) continue;
+            entries.push({
+                type: "friend",
+                key: `friend-${friend.wallet_address}`,
+                address: friend.wallet_address,
+                name: displayUserName(friend.user, friend.wallet_address),
+                username: friend.user?.username || "",
+                avatar_url: friend.user?.avatar_url || "",
+                content: "Connected. Start chatting.",
+                created_at: null,
+                unread_count: 0,
+            });
+        }
+
+        return entries;
+    })();
 
     if (!isConnected) {
         return (
@@ -393,20 +464,26 @@ function MessagesContent() {
                     ) : (
                         <div className="p-2">
                             <p className="px-2 py-1 text-xs font-mono text-white/40 uppercase">Recent Chats</p>
-                            {conversations.length === 0 && (
-                                <p className="p-2 text-sm text-white/40 text-center mt-4 border border-dashed border-white/10 p-4 rounded-lg">Search for a user to start chatting.</p>
+                            {chatEntries.length === 0 && (
+                                <p className="p-2 text-sm text-white/40 text-center mt-4 border border-dashed border-white/10 p-4 rounded-lg">Search for a user or accept a friend request to start chatting.</p>
                             )}
-                            {conversations.map(conv => {
-                                const otherAddress = conv.sender_address === address ? conv.receiver_address : conv.sender_address;
-                                const isSelected = activeChatAddress === otherAddress;
-                                const unreadCount = isSelected ? 0 : (conv.unread_count || 0);
+                            {chatEntries.map(entry => {
+                                const isSelected = normalizeAddress(activeChatAddress) === normalizeAddress(entry.address);
+                                const unreadCount = isSelected ? 0 : (entry.unread_count || 0);
                                 return (
                                     <button
-                                        key={conv.id}
+                                        key={entry.key}
                                         onClick={() => {
-                                            setSelectedUser({ wallet_address: otherAddress, name: otherAddress.slice(0, 8) + '...' });
+                                            setSelectedUser({
+                                                wallet_address: entry.address,
+                                                name: entry.name,
+                                                username: entry.username || "",
+                                                avatar_url: entry.avatar_url || "",
+                                            });
                                             // Clear unread badge visually on click
-                                            setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
+                                            if (entry.conversation) {
+                                                setConversations(prev => prev.map(c => c.id === entry.conversation.id ? { ...c, unread_count: 0 } : c));
+                                            }
                                         }}
                                         className={cn(
                                             "w-full flex items-start flex-col gap-1 p-3 rounded-lg transition-colors text-left mb-1 border border-transparent",
@@ -415,19 +492,32 @@ function MessagesContent() {
                                         )}
                                     >
                                         <div className="w-full flex justify-between items-center">
-                                            <p className="text-sm font-bold text-[#e0d4ff] font-mono truncate">{otherAddress.slice(0, 10)}...</p>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {entry.avatar_url ? (
+                                                    <img src={entry.avatar_url} alt={entry.name} className="w-7 h-7 rounded-full object-cover border border-[#2a2a30] shrink-0" />
+                                                ) : (
+                                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#a855f7] to-[#00ffff] flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                                                        {entry.name ? entry.name[0].toUpperCase() : <User className="w-3.5 h-3.5" />}
+                                                    </div>
+                                                )}
+                                                <p className="text-sm font-bold text-[#e0d4ff] truncate">{entry.name}</p>
+                                            </div>
                                             <div className="flex items-center gap-1.5 shrink-0">
                                                 {unreadCount > 0 && (
                                                     <span className="bg-[#ff2d95] text-white text-[10px] min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 font-bold">
                                                         {unreadCount > 99 ? '99+' : unreadCount}
                                                     </span>
                                                 )}
-                                                <span className="text-[10px] text-white/40 font-mono">
-                                                    {new Date(conv.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
+                                                {entry.created_at ? (
+                                                    <span className="text-[10px] text-white/40 font-mono">
+                                                        {new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] text-[#00ffff] font-mono uppercase">Friend</span>
+                                                )}
                                             </div>
                                         </div>
-                                        <p className="text-xs text-white/50 truncate w-full">{conv.content}</p>
+                                        <p className="text-xs text-white/50 truncate w-full">{entry.content}</p>
                                     </button>
                                 );
                             })}
@@ -444,8 +534,7 @@ function MessagesContent() {
                         <div className="h-16 border-b border-[#2a2a30] px-6 flex items-center justify-between bg-[#0f0f13]">
                             <div className="flex flex-col">
                                 <h3 className="text-sm font-bold text-[#e0d4ff] flex items-center gap-2">
-                                    {selectedUser.name || 'User'}
-                                    {selectedUser.username && <span className="text-xs text-[#00ffff] font-mono">@{selectedUser.username}</span>}
+                                    {selectedUser.username ? `@${selectedUser.username}` : (selectedUser.name || 'User')}
                                     {isFriend && <span className="bg-[#00ffff]/10 text-[#00ffff] px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider border border-[#00ffff]/20">Friend</span>}
                                 </h3>
                                 <span className="text-[10px] text-[#a855f7] font-mono mt-0.5">{selectedUser.wallet_address}</span>
@@ -454,7 +543,7 @@ function MessagesContent() {
 
                         {/* Messages Area */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                            {!currentConnection && selectedUser.wallet_address !== address && (
+                            {!currentConnection && normalizeAddress(selectedUser.wallet_address) !== normalizeAddress(address) && (
                                 <div className="bg-[#1a1a20] border border-[#2a2a30] rounded-xl p-6 text-center max-w-sm mx-auto mt-10">
                                     <UserPlus className="w-10 h-10 text-[#a855f7] mx-auto mb-3" />
                                     <h3 className="text-white font-bold mb-1">Not Connected</h3>
@@ -468,7 +557,7 @@ function MessagesContent() {
                                 </div>
                             )}
 
-                            {currentConnection?.status === "pending" && selectedUser.wallet_address !== address && (
+                            {currentConnection?.status === "pending" && normalizeAddress(selectedUser.wallet_address) !== normalizeAddress(address) && (
                                 <div className="bg-[#1a1a20] border border-[#2a2a30] rounded-xl p-6 text-center max-w-sm mx-auto mt-10">
                                     <Clock className="w-10 h-10 text-[#00ffff] mx-auto mb-3" />
                                     <h3 className="text-white font-bold mb-1">Request Pending</h3>
@@ -480,7 +569,7 @@ function MessagesContent() {
                                 </div>
                             )}
 
-                            {(isFriend || selectedUser.wallet_address === address) && (
+                            {(isFriend || normalizeAddress(selectedUser.wallet_address) === normalizeAddress(address)) && (
                                 <>
                                     {nextCursor && (
                                         <div className="w-full flex justify-center pb-4">
@@ -494,7 +583,7 @@ function MessagesContent() {
                                         </div>
                                     )}
                                     {messages.map((m) => {
-                                        const isMe = m.sender_address === address;
+                                        const isMe = normalizeAddress(m.sender_address) === normalizeAddress(address);
                                         return (
                                             <div key={m.id} className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}>
                                                 <div className={cn(
@@ -539,7 +628,7 @@ function MessagesContent() {
                         </div>
 
                         {/* Input Area */}
-                        {(isFriend || selectedUser.wallet_address === address) && (
+                        {(isFriend || normalizeAddress(selectedUser.wallet_address) === normalizeAddress(address)) && (
                             <div className="p-4 border-t border-[#2a2a30] bg-[#0f0f13]">
                                 {attachment.isUploading && (
                                     <div className="mb-2 text-xs text-[#00ffff] px-4">Uploading attachment...</div>
