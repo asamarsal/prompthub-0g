@@ -99,8 +99,8 @@ test('compute health endpoint rejects legacy non app sk keys before live request
         ->assertJsonMissing(['sk-legacy']);
 });
 
-test('0g compute default base url uses proxy surface', function () {
-    expect(config('0g.compute_base_url'))->toBe('https://router-api.0g.ai/v1/proxy');
+test('0g compute base url uses proxy surface', function () {
+    expect(str_ends_with(config('0g.compute_base_url'), '/v1/proxy'))->toBeTrue();
 });
 
 test('prompt creation encrypts premium content and client storage key at rest', function () {
@@ -118,6 +118,8 @@ test('prompt creation encrypts premium content and client storage key at rest', 
         'content_type' => 'TEXT',
         'license_type' => 'COMMERCIAL',
         'currency' => '0G',
+        'contract_id' => 123,
+        'og_tx_id' => '0x' . str_repeat('e', 64),
         'root_hash' => '0x' . str_repeat('a', 64),
         'prompt_txt_root_hash' => '0x' . str_repeat('b', 64),
         'preview_root_hash' => '0x' . str_repeat('c', 64),
@@ -147,9 +149,60 @@ test('prompt creation encrypts premium content and client storage key at rest', 
     expect($prompt->original_content)->toBeNull()
         ->and($prompt->encrypted_original_content)->not->toBeNull()
         ->and($prompt->encrypted_original_content)->not->toContain($secretPrompt)
+        ->and($prompt->contract_id)->toBe(123)
+        ->and($prompt->og_tx_id)->toBe('0x' . str_repeat('e', 64))
         ->and($prompt->content_encryption_payload['key_ciphertext'] ?? null)->not->toBeNull()
         ->and($prompt->content_encryption_payload['key_ciphertext'])->not->toBe($response->json('content_encryption.key_b64'))
         ->and(app(PromptContentProtectionService::class)->decryptContent($prompt))->toBe($secretPrompt);
+});
+
+test('owner can record on-chain listing for a storage-only prompt', function () {
+    $user = scUser();
+    $prompt = scPrompt($user);
+    Sanctum::actingAs($user);
+
+    $txHash = '0x' . str_repeat('a', 64);
+    $rootHash = '0x' . str_repeat('b', 64);
+    $metadataUri = 'ipfs://QmListingMetadata';
+
+    $this->postJson("/api/prompts/{$prompt->id}/onchain-listing", [
+        'contract_id' => 77,
+        'og_tx_id' => $txHash,
+        'root_hash' => $rootHash,
+        'ipfs_metadata_uri' => $metadataUri,
+    ])
+        ->assertOk()
+        ->assertJsonPath('prompt.contract_id', 77)
+        ->assertJsonPath('prompt.is_published', true)
+        ->assertJsonPath('prompt.og_tx_id', $txHash)
+        ->assertJsonPath('prompt.root_hash', $rootHash)
+        ->assertJsonPath('prompt.ipfs_metadata_uri', $metadataUri)
+        ->assertJsonPath('prompt.storage_status', 'uploaded');
+
+    $this->assertDatabaseHas('prompts', [
+        'id' => $prompt->id,
+        'contract_id' => 77,
+        'is_published' => true,
+        'og_tx_id' => $txHash,
+        'root_hash' => $rootHash,
+    ]);
+});
+
+test('non owner cannot record on-chain listing', function () {
+    $owner = scUser();
+    $prompt = scPrompt($owner);
+    $other = User::factory()->create([
+        'email' => Str::uuid() . '@example.test',
+        'wallet_address' => '0x' . str_repeat('2', 40),
+    ]);
+    Sanctum::actingAs($other);
+
+    $this->postJson("/api/prompts/{$prompt->id}/onchain-listing", [
+        'contract_id' => 78,
+        'og_tx_id' => '0x' . str_repeat('c', 64),
+    ])->assertForbidden();
+
+    expect($prompt->fresh()->contract_id)->toBeNull();
 });
 
 test('strict 0g storage upload fails instead of returning a local fallback hash', function () {

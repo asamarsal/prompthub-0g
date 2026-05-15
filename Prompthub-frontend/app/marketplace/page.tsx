@@ -21,6 +21,8 @@ function FilterSelect({
   options: string[]
   onChange: (v: string) => void
 }) {
+  const uniqueOptions = Array.from(new Set(options))
+
   return (
     <div className="relative">
       <label className="sr-only">{label}</label>
@@ -29,7 +31,7 @@ function FilterSelect({
         onChange={(e) => onChange(e.target.value)}
         className="appearance-none w-full bg-card/60 backdrop-blur-md border-2 border-border hover:border-secondary hover:text-foreground hover:shadow-[4px_4px_0_0_var(--secondary)] hover:-translate-y-0.5 hover:-translate-x-0.5 transition-all text-sm text-muted-foreground focus:outline-none focus:border-secondary px-4 py-2.5 pr-8 cursor-pointer font-semibold"
       >
-        {options.map((opt) => (
+        {uniqueOptions.map((opt) => (
           <option key={opt} value={opt} className="bg-[#0a001a] text-[#e0d4ff]">
             {opt}
           </option>

@@ -17,9 +17,9 @@ import {
 import { uploadTo0GStorageNetwork, getStorageTxExplorerUrl } from "@/lib/zero-g-storage"
 import { createPromptEncryptionContext, encryptFileFor0G } from "@/lib/prompt-encryption"
 import { useWallet } from "@/lib/wallet-context"
-import { parseEther } from "ethers"
-import { getMarketplaceContract } from "@/lib/evm"
-import { CHAIN_CONFIG } from "@/lib/contracts"
+import { formatEther, parseEther } from "ethers"
+import { ensure0GNetwork, getBrowserProvider, getMarketplaceContract } from "@/lib/evm"
+import { CHAIN_CONFIG, CONTRACTS } from "@/lib/contracts"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
 
 const steps = ["Basic Info", "Pricing & License", "Upload Content", "Preview & Confirm"]
@@ -27,6 +27,37 @@ const DRAFT_KEY = "prompthub:create-draft:v2"
 const PROMPT_VARIABLES = ["{subject}", "{style}", "{color}", "{mood}", "{aspect_ratio}"]
 const MAX_REFERENCE_IMAGES = 10
 // Removed hardcoded FALLBACK_CATEGORIES and FALLBACK_MODELS to ensure data comes only from the API.
+
+function friendlyDeployError(error: any): string {
+  const message = String(
+    error?.shortMessage
+    || error?.reason
+    || error?.info?.error?.message
+    || error?.error?.message
+    || error?.message
+    || error
+    || "Unknown error"
+  )
+
+  if (message.includes("user rejected") || message.includes("User denied") || error?.code === 4001) {
+    return "Wallet transaction was rejected."
+  }
+  if (message.includes("insufficient funds") || message.includes("exceeds balance")) {
+    return "Wallet has insufficient 0G for gas or listing transaction."
+  }
+  if (message.includes("missing revert data") || message.includes("execution reverted")) {
+    return "Marketplace contract rejected the listing transaction. Check contract address, chain, price, and royalty."
+  }
+  if (message.includes("Marketplace address not configured")) {
+    return "Marketplace contract address is not configured in frontend .env."
+  }
+  if (message.includes("could not coalesce error")) {
+    const raw = JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+    return `Wallet/RPC returned an unknown error. Raw: ${raw.slice(0, 700)}`
+  }
+
+  return message
+}
 
 function StepIndicator({ current, onStepClick }: { current: number, onStepClick?: (step: number) => void }) {
   return (
@@ -333,6 +364,51 @@ export default function CreatePageContent() {
     }
   }
 
+  const assertMarketplaceReady = async (price: string, royalty: number) => {
+    if (!isConnected || !address) {
+      throw new Error("Connect your wallet before deploying a prompt.")
+    }
+    if (!CONTRACTS.marketplace) {
+      throw new Error("Marketplace address not configured. Check NEXT_PUBLIC_MARKETPLACE_ADDRESS and restart Next.js.")
+    }
+
+    const provider = await getBrowserProvider()
+    await ensure0GNetwork(provider)
+
+    const code = await provider.getCode(CONTRACTS.marketplace)
+    if (!code || code === "0x") {
+      throw new Error(`Marketplace contract not found on ${CHAIN_CONFIG.chainName}. Address: ${CONTRACTS.marketplace}`)
+    }
+
+    const balance = await provider.getBalance(address)
+    if (balance <= BigInt(0)) {
+      throw new Error("Connected wallet has 0G balance 0. Add testnet 0G for listing gas.")
+    }
+
+    const marketplace = await getMarketplaceContract()
+    const priceWei = parseEther(String(price || "0"))
+    const royaltyPerMille = Math.max(0, Math.min(200, Math.round(royalty * 10)))
+
+    try {
+      await marketplace.listPrompt.estimateGas(
+        "ipfs://prompthub-preflight",
+        priceWei,
+        royaltyPerMille,
+        "0xpreflight"
+      )
+    } catch (estimateError: any) {
+      console.error("[Deploy preflight] Marketplace listPrompt estimate failed:", estimateError)
+      throw estimateError
+    }
+
+    console.log("[Deploy preflight] Marketplace ready", {
+      chainId: CHAIN_CONFIG.chainId,
+      marketplace: CONTRACTS.marketplace,
+      wallet: address,
+      balance0G: formatEther(balance),
+    })
+  }
+
   const handleDeploy = async () => {
     if (form.promptMode === "upload" && form.files.length === 0) {
       alert("Please upload at least one prompt file first.")
@@ -362,6 +438,9 @@ export default function CreatePageContent() {
         setDeploying(false)
         return
       }
+
+      // Stop before paid 0G Storage uploads if wallet/contract listing cannot work.
+      await assertMarketplaceReady(form.price, form.royalty)
 
       // 0. Upload Preview Image to backend (local cache for fast display)
       let finalPreviewUrl = form.previewImageUrl
@@ -616,6 +695,9 @@ export default function CreatePageContent() {
           }
         } catch { /* ignore */ }
       }
+      if (!tokenId) {
+        throw new Error("Marketplace transaction succeeded, but token ID could not be read from the 0G contract receipt.")
+      }
 
       // 5. Save to Backend DB
       await createPrompt({
@@ -673,7 +755,7 @@ export default function CreatePageContent() {
 
     } catch (error) {
       console.error("Failed to deploy prompt:", error)
-      alert("Failed to deploy prompt. Please check your connection and try again.")
+      alert(`Failed to deploy prompt: ${friendlyDeployError(error)}`)
       setDeploying(false)
     }
   }

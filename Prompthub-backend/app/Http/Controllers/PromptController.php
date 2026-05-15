@@ -148,7 +148,8 @@ class PromptController extends Controller
             'license_type' => 'required|string|in:FREE,COMMERCIAL,EXCLUSIVE',
             'commercial_use_allowed' => 'nullable|boolean',
             'royalty_percentage' => 'nullable|integer|min:0|max:100',
-            'og_tx_id' => 'nullable|string',
+            'contract_id' => 'nullable|integer|min:1',
+            'og_tx_id' => ['nullable', 'string', 'regex:/^0x[a-fA-F0-9]{64}$/'],
             'root_hash' => 'nullable|string',
             'storage_manifest' => 'nullable|array',
             'prompt_txt_root_hash' => 'nullable|string',
@@ -202,8 +203,6 @@ class PromptController extends Controller
         }
         
         $prompt = Prompt::create($validated);
-
-        // Note: contract_id is set by frontend after on-chain listPrompt tx
 
         return response()->json($prompt, 201);
     }
@@ -415,6 +414,50 @@ class PromptController extends Controller
         return response()->json([
             'message' => 'Price updated successfully.',
             'prompt' => $prompt
+        ]);
+    }
+
+    public function recordOnChainListing($id, Request $request)
+    {
+        $prompt = Prompt::findOrFail($id);
+
+        if ($request->user()->id !== $prompt->user_id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'contract_id' => 'required|integer|min:1',
+            'og_tx_id' => ['nullable', 'string', 'regex:/^0x[a-fA-F0-9]{64}$/'],
+            'root_hash' => ['nullable', 'string', 'regex:/^0x[a-fA-F0-9]{64}$/'],
+            'ipfs_metadata_uri' => 'nullable|string|max:255',
+        ]);
+
+        $updates = [
+            'contract_id' => $validated['contract_id'],
+            'is_published' => true,
+        ];
+
+        if (!empty($validated['og_tx_id'])) {
+            $updates['og_tx_id'] = strtolower($validated['og_tx_id']);
+        }
+
+        if (!empty($validated['root_hash']) && empty($prompt->root_hash)) {
+            $updates['root_hash'] = strtolower($validated['root_hash']);
+        }
+
+        if (!empty($validated['ipfs_metadata_uri']) && empty($prompt->ipfs_metadata_uri)) {
+            $updates['ipfs_metadata_uri'] = $validated['ipfs_metadata_uri'];
+        }
+
+        if ($prompt->storage_status !== 'uploaded') {
+            $updates['storage_status'] = 'uploaded';
+        }
+
+        $prompt->update($updates);
+
+        return response()->json([
+            'message' => 'On-chain listing recorded successfully.',
+            'prompt' => $prompt->fresh(),
         ]);
     }
 

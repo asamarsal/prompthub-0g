@@ -9,7 +9,7 @@ import { prompts as mockPrompts } from "@/lib/mock-data"
 import { ChevronRight, Check, Copy, Heart, Share2, Star, ExternalLink, Zap, Lock, BadgeCheck, Clock, Unlock, Loader2, FileText, Eye, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, generatePromptPreviewTeaser } from "@/lib/api"
+import { getPrompt, toggleBookmark, fetchPremiumContent, deactivatePrompt, relistPrompt, updatePromptPrice, submitReview, scorePrompt, generatePromptPreviewTeaser, recordOnChainListing } from "@/lib/api"
 import { SimilarPrompts } from "@/components/similar-prompts"
 import { useWallet } from "@/lib/wallet-context"
 import { use0GPrice } from "@/lib/hooks/use-0g-price"
@@ -40,6 +40,16 @@ function formatCompactNumber(value: number) {
 function shortHash(value?: string | null) {
     if (!value) return "Not set"
     return value.length > 20 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value
+}
+
+async function copyText(value: string, label: string) {
+    if (!value) return
+    await navigator.clipboard.writeText(value)
+    toast.success(`${label} copied`)
+}
+
+function isBytes32Hash(value?: string | null): value is string {
+    return typeof value === "string" && /^0x[a-fA-F0-9]{64}$/.test(value)
 }
 
 export default function PromptDetailPageContent({ params }: { params: { id: string } }) {
@@ -105,6 +115,98 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
             toast.error(e?.message || "Failed to generate preview teaser")
         } finally {
             setTeaserLoading(false)
+        }
+    }
+
+    const handleListMissingContract = async () => {
+        if (!prompt?.id) return
+
+        const metadataUri = prompt.ipfsMetadataUri || prompt.cid
+        const storageHash = prompt.rootHash || prompt.textPackageRootHash || prompt.promptTxtRootHash
+        const price = Number(prompt.price || 0)
+        const royaltyPerMille = Math.max(0, Math.min(200, Math.round(Number(prompt.royalty || 0) * 10)))
+
+        if (!metadataUri) {
+            toast.error("Metadata IPFS belum tersedia untuk listing.")
+            return
+        }
+
+        if (!isBytes32Hash(storageHash)) {
+            toast.error("0G storage root hash tidak valid untuk contract listing.")
+            return
+        }
+
+        if (!Number.isFinite(price) || price <= 0) {
+            toast.error("Harga harus lebih dari 0 0G sebelum listing on-chain.")
+            return
+        }
+
+        if (!confirm("List this saved prompt to 0G Marketplace using the existing 0G Storage and Pinata metadata refs?")) {
+            return
+        }
+
+        setIsActionLoading(true)
+        try {
+            const marketplace = await getMarketplaceContract()
+            const tx = await marketplace.listPrompt(
+                metadataUri,
+                parseEther(String(price)),
+                royaltyPerMille,
+                storageHash,
+            )
+            const receipt = await tx.wait()
+            if (!receipt) {
+                throw new Error("0G listing transaction was not confirmed.")
+            }
+
+            let tokenId: bigint | null = null
+            for (const log of receipt.logs || []) {
+                try {
+                    const parsed = marketplace.interface.parseLog(log)
+                    if (parsed?.name === "PromptListed") {
+                        tokenId = parsed.args?.tokenId ?? parsed.args?.[0] ?? null
+                        break
+                    }
+                } catch {
+                    // Ignore unrelated logs emitted in the same transaction.
+                }
+            }
+
+            if (tokenId === null) {
+                const totalPrompts = await marketplace.totalPrompts?.()
+                if (totalPrompts) tokenId = totalPrompts
+            }
+
+            if (tokenId === null) {
+                throw new Error("0G listing succeeded, but token id was not found in the receipt.")
+            }
+
+            const tokenIdNumber = Number(tokenId)
+            if (!Number.isSafeInteger(tokenIdNumber) || tokenIdNumber <= 0) {
+                throw new Error("Invalid token id returned by the marketplace contract.")
+            }
+
+            await recordOnChainListing(prompt.id, {
+                contract_id: tokenIdNumber,
+                og_tx_id: tx.hash,
+                root_hash: storageHash,
+                ipfs_metadata_uri: metadataUri,
+            })
+
+            setPrompt((prev: any) => ({
+                ...prev,
+                contract_id: tokenIdNumber,
+                isListed: true,
+                txId: tx.hash,
+                rootHash: prev?.rootHash || storageHash,
+                ipfsMetadataUri: prev?.ipfsMetadataUri || metadataUri,
+            }))
+            toast.success(`Prompt listed on 0G as token #${tokenIdNumber}`)
+        } catch (e: any) {
+            console.error(e)
+            toast.error(e?.shortMessage || e?.message || "Failed to list prompt on 0G")
+        } finally {
+            setIsActionLoading(false)
         }
     }
 
@@ -390,7 +492,9 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                     {premiumContent ? (
                                         <>
                                             <Unlock className="w-12 h-12 text-[#b4ff39] mx-auto mb-3" />
-                                            <p className="text-sm text-[#b4ff39] font-bold uppercase tracking-widest">Purchased - Content Unlocked</p>
+                                            <p className="text-sm text-[#b4ff39] font-bold uppercase tracking-widest">
+                                                {isOwner ? "Seller - Content Unlocked" : "Purchased - Content Unlocked"}
+                                            </p>
                                         </>
                                     ) : (
                                         <>
@@ -791,7 +895,7 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                         ~${((typeof prompt.price === 'number' ? prompt.price : 0) * ogPrice).toFixed(2)} USD
                                     </p>
                                     <a
-                                        href="https://coinmarketcap.com/id/currencies/0g/"
+                                        href="https://coinmarketcap.com/currencies/zero-gravity/"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-[10px] font-display font-black text-[#00ffff] hover:underline uppercase tracking-widest flex items-center gap-1"
@@ -827,21 +931,23 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
 
                                 <button
                                     onClick={() => setPurchaseOpen(true)}
-                                    disabled={!!premiumContent || !prompt.contract_id || prompt.contract_id === 0 || !prompt.isListed}
+                                    disabled={isOwner || !!premiumContent || !prompt.contract_id || prompt.contract_id === 0 || !prompt.isListed}
                                     className={cn(
                                         "w-full py-4 text-base font-extrabold uppercase mb-4 transition-all border-2",
-                                        premiumContent
+                                        isOwner
+                                            ? "bg-[#00ffff]/10 border-[#00ffff] text-[#00ffff] cursor-default"
+                                            : premiumContent
                                             ? "bg-[#b4ff39]/10 border-[#b4ff39] text-[#b4ff39] cursor-default"
                                             : (!prompt.contract_id || prompt.contract_id === 0 || !prompt.isListed)
                                                 ? "bg-white/5 border-white/10 text-white/20 cursor-not-allowed opacity-50"
                                                 : "bg-[#00ffff] border-[#00ffff] text-black hover:bg-transparent hover:text-[#00ffff]"
                                     )}
                                 >
-                                    {premiumContent ? "Already Purchased" : (!prompt.contract_id || prompt.contract_id === 0 || !prompt.isListed) ? "Not Listed On-Chain" : "Buy Now"}
+                                    {isOwner ? "You Are The Seller Of This Prompt" : premiumContent ? "Already Purchased" : (!prompt.contract_id || prompt.contract_id === 0 || !prompt.isListed) ? "Not Listed On-Chain" : "Buy Now"}
                                 </button>
 
                                 {/* Explorer link for the purchase */}
-                                {premiumContent && (
+                                {premiumContent && !isOwner && (
                                     <div className="mb-4 text-center">
                                         {transactions.find(t => t.buyer_address === address) ? (
                                             <a
@@ -979,7 +1085,26 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                                 </button>
                                             )
                                         ) : (
-                                            <p className="text-[10px] text-[#a78bfa]/70 uppercase tracking-widest">No contract token id found.</p>
+                                            <div className="border border-[#2a2a30] bg-[#160f24]/70 p-3">
+                                                <p className="text-[10px] text-[#a78bfa]/70 uppercase tracking-widest">
+                                                    No contract token id found.
+                                                </p>
+                                                <p className="mt-2 text-[9px] text-[#a78bfa]/45 leading-relaxed">
+                                                    Storage/IPFS refs exist, but the marketplace contract listing was not recorded. List it now without uploading the prompt package again.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleListMissingContract}
+                                                    disabled={
+                                                        isActionLoading ||
+                                                        !prompt.ipfsMetadataUri ||
+                                                        !isBytes32Hash(prompt.rootHash || prompt.textPackageRootHash || prompt.promptTxtRootHash)
+                                                    }
+                                                    className="mt-3 w-full bg-[#00ffff]/10 border border-[#00ffff] py-2 text-[10px] font-black text-[#00ffff] hover:bg-[#00ffff]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all uppercase tracking-widest"
+                                                >
+                                                    {isActionLoading ? "Listing..." : "List On 0G"}
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -1047,12 +1172,15 @@ export default function PromptDetailPageContent({ params }: { params: { id: stri
                                         ].map(([label, value]) => (
                                             <div key={label} className="flex items-center justify-between gap-3">
                                                 <span className="text-[10px] text-[#a78bfa]/60 uppercase">{label}</span>
-                                                <span
-                                                    className={`max-w-[150px] truncate text-right text-[10px] font-mono ${value ? "text-[#00ffff]" : "text-[#a78bfa]/35"}`}
+                                                <button
+                                                    type="button"
+                                                    disabled={!value}
+                                                    onClick={() => copyText(String(value || ""), String(label))}
+                                                    className={`max-w-[150px] truncate text-right text-[10px] font-mono transition-colors ${value ? "text-[#00ffff] hover:text-[#b4ff39] cursor-copy" : "text-[#a78bfa]/35 cursor-not-allowed"}`}
                                                     title={String(value || "Not set")}
                                                 >
                                                     {shortHash(String(value || ""))}
-                                                </span>
+                                                </button>
                                             </div>
                                         ))}
                                     </div>

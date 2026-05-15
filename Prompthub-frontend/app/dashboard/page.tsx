@@ -63,12 +63,18 @@ export default function DashboardPage() {
       toast.error("Connect wallet first")
       return
     }
+    if (!profile?.avatar_url) {
+      toast.error("Profile photo required", {
+        description: "Upload an avatar in your profile before registering as an AI Agent.",
+      })
+      return
+    }
     setAgentRegLoading(true)
     try {
       const metadata = await uploadMetadata({
         name: profile?.name || profile?.username || `PromptHub Agent ${walletAddress.slice(0, 8)}`,
         description: profile?.bio || "PromptHub AI creator identity and reputation metadata.",
-        image: profile?.avatar_url || "",
+        image: profile.avatar_url,
         properties: {
           wallet_address: walletAddress,
           username: profile?.username || null,

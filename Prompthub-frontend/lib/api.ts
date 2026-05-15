@@ -801,6 +801,21 @@ export async function relistPrompt(id: string | number, data: { price_0g: number
     });
 }
 
+/**
+ * POST /api/prompts/{id}/onchain-listing
+ */
+export async function recordOnChainListing(id: string | number, data: {
+    contract_id: number
+    og_tx_id?: string
+    root_hash?: string
+    ipfs_metadata_uri?: string
+}): Promise<any> {
+    return request<any>(`/api/prompts/${id}/onchain-listing`, {
+        method: "POST",
+        body: JSON.stringify(data)
+    });
+}
+
 // ─── Messages & Notifications ─────────────────────────────────────────────
 
 export async function searchUsers(query: string): Promise<ApiUser[]> {

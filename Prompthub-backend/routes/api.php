@@ -79,6 +79,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/prompts/{id}/curate', [PromptController::class, 'curate']);
     Route::post('/prompts/{id}/deactivate', [PromptController::class, 'deactivate']);
     Route::post('/prompts/{id}/relist', [PromptController::class, 'relist']);
+    Route::post('/prompts/{id}/onchain-listing', [PromptController::class, 'recordOnChainListing']);
     Route::put('/prompts/{id}/price', [PromptController::class, 'updatePrice']);
     Route::get('/prompts/{id}/content', [PromptController::class, 'getContent'])->middleware('x402');
     Route::get('/prompts/{id}/storage-refs', [PromptController::class, 'storageRefs'])->middleware('x402');

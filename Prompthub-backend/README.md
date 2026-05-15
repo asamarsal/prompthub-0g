@@ -175,8 +175,8 @@ Copy `.env.example` to `.env` and configure:
 | `PINATA_GATEWAY` | `https://gateway.pinata.cloud/ipfs/` |
 | `PINATA_GROUP_ID` | Pinata group for organizing pins |
 | **0G Compute (AI)** | |
-| `ZG_COMPUTE_API_KEY` | 0G Compute API key |
-| `ZG_COMPUTE_BASE_URL` | `https://router-api.0g.ai/v1` |
+| `ZG_COMPUTE_API_KEY` | 0G Compute provider token, usually `app-sk-...` |
+| `ZG_COMPUTE_BASE_URL` | Provider service URL with `/v1/proxy`, for example `https://router-api.0g.ai/v1/proxy` |
 | `ZG_COMPUTE_MODEL` | `0GM-1.0-35B-A3B` |
 | `ZG_COMPUTE_FALLBACK_MODEL` | `deepseek/deepseek-chat-v3-0324` |
 | **WebSocket (Reverb)** | |
