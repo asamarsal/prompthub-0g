@@ -86,6 +86,23 @@ test('compute health endpoint reports configured model without leaking secrets',
         ->assertJsonMissing(['ZG_COMPUTE_API_KEY']);
 });
 
+test('compute health endpoint rejects legacy non app sk keys before live request', function () {
+    putenv('ZG_COMPUTE_API_KEY=sk-legacy');
+    $_ENV['ZG_COMPUTE_API_KEY'] = 'sk-legacy';
+    $_SERVER['ZG_COMPUTE_API_KEY'] = 'sk-legacy';
+    Sanctum::actingAs(scUser());
+
+    $this->getJson('/api/compute/health')
+        ->assertStatus(422)
+        ->assertJsonPath('source', 'config-validation')
+        ->assertJsonPath('reason', 'ZG_COMPUTE_API_KEY must be a provider app-sk token for the /v1/proxy endpoint')
+        ->assertJsonMissing(['sk-legacy']);
+});
+
+test('0g compute default base url uses proxy surface', function () {
+    expect(config('0g.compute_base_url'))->toBe('https://router-api.0g.ai/v1/proxy');
+});
+
 test('prompt creation encrypts premium content and client storage key at rest', function () {
     scDisableComputeKey();
     $user = scUser();

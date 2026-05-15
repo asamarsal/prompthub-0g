@@ -62,7 +62,7 @@ class PromptScoreController extends Controller
         ], 0.2);
 
         if (!is_array($parsed)) {
-            return $this->heuristicScore($input, 'Invalid 0G Compute scorer response');
+            return $this->heuristicScore($input, $this->compute->lastFailureReason() ?: 'Invalid 0G Compute scorer response');
         }
 
         return $this->normalizeScore($parsed, '0g-compute', (string) ($parsed['_model'] ?? config('0g.compute_model')));

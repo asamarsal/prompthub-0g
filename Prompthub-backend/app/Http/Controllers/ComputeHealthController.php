@@ -29,6 +29,18 @@ class ComputeHealthController extends Controller
             ]);
         }
 
+        if (!str_starts_with((string) $apiKey, 'app-sk-')) {
+            return response()->json([
+                'configured' => true,
+                'base_url' => config('0g.compute_base_url'),
+                'model' => $model,
+                'fallback_model' => $fallbackModel,
+                'live' => false,
+                'source' => 'config-validation',
+                'reason' => 'ZG_COMPUTE_API_KEY must be a provider app-sk token for the /v1/proxy endpoint',
+            ], 422);
+        }
+
         $result = $this->compute->chatContent([
             [
                 'role' => 'system',
