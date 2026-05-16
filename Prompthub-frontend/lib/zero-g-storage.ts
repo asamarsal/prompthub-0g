@@ -12,6 +12,8 @@
  * 4. txHash is viewable on ChainScan: https://chainscan-galileo.0g.ai/tx/{txHash}
  */
 
+import { uploadTo0GStorage } from "./api"
+
 export interface ZgUploadResult {
   rootHash: string
   txHash: string
@@ -20,49 +22,34 @@ export interface ZgUploadResult {
 }
 
 /**
- * Upload a browser File to 0G Storage network via server-side API route.
- * This avoids browser `fs` module issues with the 0G SDK.
+ * Upload a browser File to 0G Storage network via the Laravel VPS backend.
+ * This avoids Vercel's strict function timeouts (15s) and browser `fs` limitations.
+ * The Laravel backend handles the 0G SDK logic and provides a local fallback.
  *
  * @param file - Browser File object to upload
  * @returns Upload result with rootHash for retrieval/verification
  */
 export async function uploadTo0GStorageNetwork(file: File): Promise<ZgUploadResult> {
   try {
-    const formData = new FormData()
-    formData.append("file", file)
+    console.log("[0G Storage] Uploading via VPS Backend...", file.name, file.size, "bytes")
 
-    console.log("[0G Storage] Uploading via server API route...", file.name, file.size, "bytes")
-
-    const res = await fetch("/api/storage-upload", {
-      method: "POST",
-      body: formData,
-    })
-
-    const data = await res.json()
-
-    if (!res.ok || !data.success) {
-      console.warn("[0G Storage] Server upload failed:", data.error)
-      return {
-        rootHash: "",
-        txHash: "",
-        success: false,
-        error: data.error || `HTTP ${res.status}`,
-      }
-    }
+    // Call the Laravel backend API which is more persistent than Vercel
+    const data = await uploadTo0GStorage(file, "content", false)
 
     console.log("[0G Storage] SUCCESS! rootHash:", data.rootHash, "txHash:", data.txHash)
+
     return {
       rootHash: data.rootHash,
-      txHash: data.txHash,
+      txHash: data.txHash || "",
       success: true,
     }
   } catch (err: any) {
-    console.error("[0G Storage] Upload error:", err?.message)
+    console.error("[0G Storage] VPS Upload error:", err?.message)
     return {
       rootHash: "",
       txHash: "",
       success: false,
-      error: err?.message || "Network error",
+      error: err?.message || "VPS Network error",
     }
   }
 }
