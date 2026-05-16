@@ -6,6 +6,7 @@
   "scripts": {
     "compile": "hardhat compile --config hardhat.config.cjs",
     "deploy:0g-testnet": "hardhat run scripts/deploy.cjs --network 0g-testnet --config hardhat.config.cjs",
+    "deploy:0g-mainnet": "hardhat run scripts/deploy.cjs --network 0g-mainnet --config hardhat.config.cjs",
     "test": "hardhat test --config hardhat.config.cjs"
   },
   "author": "",

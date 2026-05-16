@@ -16,5 +16,11 @@ module.exports = {
       chainId: 16602,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
+    "0g-mainnet": {
+      url: process.env.MAINNET_RPC_URL || "https://evmrpc.0g.ai",
+      chainId: 16661,
+      accounts: process.env.MAINNET_PRIVATE_KEY ? [process.env.MAINNET_PRIVATE_KEY] : [],
+    },
   },
+
 };
