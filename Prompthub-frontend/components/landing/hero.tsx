@@ -55,7 +55,12 @@ export function Hero() {
         className="absolute inset-0 w-full h-full object-cover"
         aria-hidden="true"
       />
-      {/* No overlay — video plays full without color tint */}
+
+      {/* Blur Glassmorphism Overlay (20% Opacity) */}
+      <div
+        className="absolute inset-0 bg-black/30 z-[1]"
+        aria-hidden="true"
+      />
 
       {/* Decorative Structural Accents */}
       <div className="absolute top-32 left-8 w-24 h-24 border-t-2 border-l-2 border-primary/40 hidden xl:block" aria-hidden="true" />

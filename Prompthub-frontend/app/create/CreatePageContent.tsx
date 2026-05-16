@@ -53,10 +53,7 @@ function friendlyDeployError(error: any): string {
   }
   if (message.includes("could not coalesce error")) {
     const raw = JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-    if (raw.includes("0xdc88032e") && raw.includes("0000000000000000000000000000000000000000000000000000000000000000")) {
-      return "Deployment failed because price was 0. Price must be greater than 0 0G."
-    }
-    return `Wallet/RPC returned an unknown error. Raw: ${raw.slice(0, 700)}`
+    return `Wallet/RPC returned an unknown error. The transaction was sent with a nonzero price, so check gas, contract address, and chain. Raw: ${raw.slice(0, 700)}`
   }
 
   if (message.includes("Price must be > 0")) {
@@ -713,11 +710,29 @@ export default function CreatePageContent() {
       const marketplace = await getMarketplaceContract()
       const royaltyPerMille = Math.max(0, Math.min(200, Math.round(form.royalty * 10)))
       const priceWei = parseEther(String(form.price || "0"))
-      const tx = await marketplace.listPrompt(
+      if (priceWei <= BigInt(0)) {
+        throw new Error("Price must be > 0")
+      }
+      const estimatedGas = await marketplace.listPrompt.estimateGas(
         metadataCID,
         priceWei,
         royaltyPerMille,
         finalStorageHash
+      )
+      const gasLimit = (estimatedGas * BigInt(125)) / BigInt(100)
+      console.log("[Marketplace listPrompt] Prepared tx", {
+        priceInput: form.price,
+        priceWei: priceWei.toString(),
+        royaltyPerMille,
+        estimatedGas: estimatedGas.toString(),
+        gasLimit: gasLimit.toString(),
+      })
+      const tx = await marketplace.listPrompt(
+        metadataCID,
+        priceWei,
+        royaltyPerMille,
+        finalStorageHash,
+        { gasLimit }
       )
       const receipt = await tx.wait()
       console.log("Marketplace tx receipt:", receipt?.hash, "logs:", receipt?.logs?.length)
