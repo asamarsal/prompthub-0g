@@ -111,7 +111,7 @@ export function Hero() {
         {/* Header block */}
         <div className="text-center md:text-left flex flex-col md:flex-row items-center justify-between w-full max-w-5xl mb-16 gap-8">
           <div className="flex flex-col">
-            <h1 className="text-6xl md:text-8xl lg:text-[7rem] font-display font-extrabold tracking-tighter uppercase leading-[0.85] text-white [text-shadow:_0_2px_20px_rgba(0,0,0,0.8),_0_0_40px_rgba(0,0,0,0.5)]">
+            <h1 className="text-7xl md:text-8xl lg:text-[7rem] font-display font-extrabold tracking-tighter uppercase leading-[0.85] text-white [text-shadow:_0_2px_20px_rgba(0,0,0,0.8),_0_0_40px_rgba(0,0,0,0.5)]">
               {promptText}<br />
               <span className="text-primary filter drop-shadow-[0_0_20px_rgba(0,217,255,0.6)]">{hubText}</span>
             </h1>
