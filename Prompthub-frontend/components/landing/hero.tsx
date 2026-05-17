@@ -79,9 +79,9 @@ export function Hero() {
         autoPlay
         loop
         muted
-        playsInline``
-      className="absolute inset-0 w-full h-full object-cover"
-      aria-hidden="true"
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        aria-hidden="true"
       />
 
       {/* Blur Glassmorphism Overlay (20% Opacity) */}
