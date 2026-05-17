@@ -51,7 +51,7 @@ export async function getBrowserProvider() {
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("Wallet provider not found. Please install MetaMask.");
   }
-  return new BrowserProvider(window.ethereum);
+  return new BrowserProvider(window.ethereum, "any");
 }
 
 export function chainIdHex(chainId: number) {

@@ -59,6 +59,17 @@ class PromptController extends Controller
             $query->where('is_nsfw', false);
         }
 
+        // Filter by Curated
+        if ($request->has('is_curated')) {
+            $query->where('is_curated', filter_var($request->is_curated, FILTER_VALIDATE_BOOLEAN));
+        }
+
+        // Filter by specific IDs
+        if ($request->has('ids')) {
+            $ids = is_array($request->ids) ? $request->ids : explode(',', $request->ids);
+            $query->whereIn('id', $ids);
+        }
+
         // Filter License Type
         if ($request->has('license')) {
             $query->where('license_type', strtoupper($request->license));
@@ -101,8 +112,18 @@ class PromptController extends Controller
         }
 
         $perPage = min(max((int) $request->get('per_page', 15), 1), 100);
+        $paginator = $query->paginate($perPage);
 
-        return response()->json($query->paginate($perPage));
+        // Sort manually if specific ids are requested to match the exact order
+        if ($request->has('ids') && is_string($request->ids) && !empty($request->ids)) {
+            $ids = explode(',', $request->ids);
+            $sortedItems = $paginator->getCollection()->sortBy(function($model) use ($ids) {
+                return array_search($model->id, $ids);
+            })->values();
+            $paginator->setCollection($sortedItems);
+        }
+
+        return response()->json($paginator);
     }
 
     public function show($id)

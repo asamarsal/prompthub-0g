@@ -240,6 +240,19 @@ export async function getSystemStatus(): Promise<SystemStatusResponse> {
     return request<SystemStatusResponse>("/api/status")
 }
 
+export async function getSettings(): Promise<Record<string, string>> {
+    return request<Record<string, string>>("/api/settings")
+}
+
+export async function updateSettings(settings: Record<string, string>): Promise<{ message: string }> {
+    const adminToken = getAdminToken()
+    return request<{ message: string }>("/api/admin/settings", {
+        method: "PUT",
+        headers: adminToken ? { "X-Admin-Token": adminToken } : {},
+        body: JSON.stringify({ settings }),
+    })
+}
+
 export interface MarketplaceStats {
     active_creators: number;
     listed_prompts: number;

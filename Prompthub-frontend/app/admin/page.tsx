@@ -19,6 +19,8 @@ import {
   getApiToken,
   getCategories,
   getPrompts,
+  getSettings,
+  updateSettings,
   loginWithWallet,
   requestAdminPasswordOtp,
   updateAiModel,
@@ -147,6 +149,19 @@ export default function AdminPage() {
     description: "",
     category_id: "",
   })
+  
+  const [siteSettings, setSiteSettings] = useState({
+    landing_featured_title: "Featured Prompts",
+    landing_featured_subtitle: "Discover top-rated prompts from the best creators.",
+    landing_featured_prompt_ids: ""
+  })
+  const [settingsLoading, setSettingsLoading] = useState(false)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsCollapsed, setSettingsCollapsed] = useState(false)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
 
   const normalizedAddress = address?.toLowerCase() || ""
   const isAllowedWallet = normalizedAddress === ADMIN_WALLET
@@ -185,6 +200,22 @@ export default function AdminPage() {
     }
   }
 
+  const loadSettings = async () => {
+    try {
+      setSettingsLoading(true)
+      const res = await getSettings()
+      setSiteSettings(prev => ({
+        landing_featured_title: res.landing_featured_title || prev.landing_featured_title,
+        landing_featured_subtitle: res.landing_featured_subtitle || prev.landing_featured_subtitle,
+        landing_featured_prompt_ids: res.landing_featured_prompt_ids || "",
+      }))
+    } catch (error) {
+      console.error("Failed to load settings", error)
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
   useEffect(() => {
     setAdminAuthenticated(Boolean(getAdminToken()))
   }, [])
@@ -193,6 +224,7 @@ export default function AdminPage() {
     if (adminAuthenticated && isAllowedWallet) {
       loadPrompts()
       loadTaxonomy()
+      loadSettings()
     }
   }, [adminAuthenticated, isAllowedWallet])
 
@@ -215,6 +247,15 @@ export default function AdminPage() {
       return matchesSearch && matchesStatus
     })
   }, [prompts, search, statusFilter])
+
+  // Reset page when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter])
+
+  const totalFiltered = filteredPrompts.length
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage))
+  const paginatedPrompts = filteredPrompts.slice((currentPage - 1) * perPage, currentPage * perPage)
 
   const curatedCount = prompts.filter((prompt) => prompt.isCurated).length
   const communityCount = prompts.length - curatedCount
@@ -394,6 +435,22 @@ export default function AdminPage() {
     }
   }
 
+  const handleSettingsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSettingsSaving(true)
+    try {
+      await ensureApiSession()
+      await updateSettings(siteSettings)
+      toast.success("Site settings updated")
+      await loadSettings()
+    } catch (error) {
+      console.error("Failed to update settings", error)
+      toast.error(error instanceof Error ? error.message : "Failed to update settings")
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
   const handleEditCategory = (category: ApiCategory) => {
     setEditingCategoryId(category.id)
     setCategoryForm({
@@ -485,6 +542,42 @@ export default function AdminPage() {
         setAdminAuthenticated(false)
       }
       toast.error(error instanceof Error ? error.message : "Failed to update curation status")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleFeaturedChange = async (promptId: string, nextValue: boolean) => {
+    const currentIds = siteSettings.landing_featured_prompt_ids.split(',').map(id => id.trim()).filter(Boolean)
+    let newIds: string[]
+    
+    if (nextValue) {
+      if (currentIds.length >= 6) {
+        toast.error("You can only feature up to 6 prompts. Unfeature one first.")
+        return
+      }
+      if (!currentIds.includes(promptId)) {
+        newIds = [...currentIds, promptId]
+      } else {
+        newIds = currentIds
+      }
+    } else {
+      newIds = currentIds.filter(id => id !== promptId)
+    }
+    
+    const newSettings = { ...siteSettings, landing_featured_prompt_ids: newIds.join(',') }
+    setSiteSettings(newSettings)
+    setUpdatingId(promptId)
+    
+    try {
+      await ensureApiSession()
+      await updateSettings(newSettings)
+      toast.success(nextValue ? "Prompt added to Featured" : "Prompt removed from Featured")
+    } catch (error) {
+      console.error("Failed to update featured status", error)
+      // Revert on error
+      setSiteSettings(siteSettings)
+      toast.error(error instanceof Error ? error.message : "Failed to update featured status")
     } finally {
       setUpdatingId(null)
     }
@@ -688,6 +781,65 @@ export default function AdminPage() {
             </div>
           </form>
         )}
+
+        {/* Site Settings Panel */}
+        <div className="mb-6 border border-[#2a2a30] bg-[#16161a]/60 p-5">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              className="cursor-pointer group flex-1"
+              onClick={() => setSettingsCollapsed(!settingsCollapsed)}
+            >
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00ffff] group-hover:text-[#b4ff39] transition-colors">
+                Landing Page Settings
+                {settingsCollapsed ? (
+                  <ChevronDown className="h-4 w-4 text-[#a78bfa] group-hover:text-[#b4ff39]" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-[#a78bfa] group-hover:text-[#b4ff39]" />
+                )}
+              </p>
+              {!settingsCollapsed && (
+                <p className="mt-1 text-sm text-[#a78bfa]">
+                  Customize the title, subtitle, and explicitly select the 6 prompts that appear on the Featured Prompts section on the landing page.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {!settingsCollapsed && (
+            <form onSubmit={handleSettingsSubmit} className="grid gap-4 max-w-3xl">
+              <label className="grid gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">Featured Section Title</span>
+                <input
+                  value={siteSettings.landing_featured_title}
+                  onChange={(event) => setSiteSettings(prev => ({ ...prev, landing_featured_title: event.target.value }))}
+                  className="h-11 w-full border-2 border-[#2a2a30] bg-[#0f0f13] px-3 py-2 text-sm text-white focus:border-[#00ffff] focus:outline-none"
+                  placeholder="Featured Prompts"
+                  required
+                />
+              </label>
+              <label className="grid gap-2 mb-4">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">Featured Section Subtitle</span>
+                <input
+                  value={siteSettings.landing_featured_subtitle}
+                  onChange={(event) => setSiteSettings(prev => ({ ...prev, landing_featured_subtitle: event.target.value }))}
+                  className="h-11 w-full border-2 border-[#2a2a30] bg-[#0f0f13] px-3 py-2 text-sm text-white focus:border-[#00ffff] focus:outline-none"
+                  placeholder="Discover top-rated prompts from the best creators."
+                  required
+                />
+              </label>
+              <div className="flex items-end mt-2">
+                <Button
+                  type="submit"
+                  disabled={settingsSaving}
+                  className="h-11 w-full rounded-none bg-[#00ffff] font-extrabold uppercase tracking-wider text-black hover:bg-[#00d7d7] lg:w-auto px-8"
+                >
+                  {settingsSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Settings
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
 
         <div className="mb-6 border border-[#2a2a30] bg-[#16161a]/60 p-5">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1028,11 +1180,12 @@ export default function AdminPage() {
                     <th className="px-4 py-4 font-bold">Category</th>
                     <th className="px-4 py-4 font-bold">Price</th>
                     <th className="px-4 py-4 font-bold">Status</th>
+                    <th className="px-4 py-4 text-center font-bold">Featured</th>
                     <th className="px-4 py-4 text-right font-bold">Curate</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPrompts.map((prompt) => (
+                  {paginatedPrompts.map((prompt) => (
                     <tr key={prompt.id} className="border-b border-[#2a2a30]/70 hover:bg-white/[0.03]">
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
@@ -1087,6 +1240,17 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
+                        <div className="flex items-center justify-center gap-3">
+                          <Switch
+                            checked={siteSettings.landing_featured_prompt_ids.includes(prompt.id)}
+                            disabled={!isConnected || updatingId === prompt.id}
+                            onCheckedChange={(checked) => handleFeaturedChange(prompt.id, checked)}
+                            aria-label={`Set ${prompt.title} featured status`}
+                            className="h-6 w-11 data-[state=checked]:bg-[#00ffff] data-[state=unchecked]:bg-[#2a2a30]"
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-3">
                           {updatingId === prompt.id && <Loader2 className="h-4 w-4 animate-spin text-[#00ffff]" />}
                           <Switch
@@ -1102,6 +1266,57 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          
+          {/* Pagination Controls */}
+          {!loading && filteredPrompts.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-[#2a2a30] bg-[#0f0f13] p-4 gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">Show</span>
+                <select
+                  value={perPage}
+                  onChange={(e) => {
+                    setPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="h-9 border-2 border-[#2a2a30] bg-[#16161a] px-2 text-sm text-white focus:border-[#00ffff] focus:outline-none"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">Entries</span>
+              </div>
+              
+              <div className="text-xs font-bold uppercase tracking-widest text-[#a78bfa]">
+                Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, totalFiltered)} of {totalFiltered} entries
+              </div>
+
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="h-9 rounded-none border border-[#2a2a30] bg-transparent px-3 text-xs text-[#a78bfa] hover:border-[#00ffff] hover:bg-transparent hover:text-white disabled:opacity-50"
+                >
+                  Prev
+                </Button>
+                
+                <div className="flex items-center justify-center px-3 text-sm font-bold text-white bg-[#2a2a30]/50 border border-[#2a2a30]">
+                  {currentPage} / {totalPages}
+                </div>
+
+                <Button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="h-9 rounded-none border border-[#2a2a30] bg-transparent px-3 text-xs text-[#a78bfa] hover:border-[#00ffff] hover:bg-transparent hover:text-white disabled:opacity-50"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </div>

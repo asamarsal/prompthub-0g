@@ -1,10 +1,45 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
-import { prompts } from "@/lib/mock-data"
+import { getPrompts, getSettings } from "@/lib/api"
 import { PromptCard } from "@/components/prompt-card"
+
+function formatCreator(prompt: any) {
+  const address = prompt.user?.wallet_address
+  if (prompt.user?.name) return prompt.user.name
+  if (!address) return "Unknown creator"
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+function mapApiPromptToCard(apiPrompt: any) {
+  return {
+    id: apiPrompt.id,
+    title: apiPrompt.title,
+    creator: apiPrompt.user?.wallet_address || "",
+    creatorName: formatCreator(apiPrompt),
+    creatorAvatar: apiPrompt.user?.avatar_url || "",
+    price: Number.parseFloat(apiPrompt.price_0g ?? "0"),
+    currency: apiPrompt.currency || "0G",
+    rating: apiPrompt.rating || 0,
+    reviews: apiPrompt.reviews || 0,
+    sales: apiPrompt.sales || 0,
+    license: apiPrompt.license_type || "Free",
+    royalty: apiPrompt.royalty_percentage || 0,
+    tags: apiPrompt.tags || [],
+    category: apiPrompt.category || "Uncategorized",
+    model: apiPrompt.ai_model || "Unknown model",
+    createdAt: apiPrompt.created_at,
+    description: apiPrompt.description || "",
+    isNsfw: Boolean(apiPrompt.is_nsfw),
+    isCurated: Boolean(apiPrompt.is_curated),
+    image: apiPrompt.preview_image_url || null,
+    referenceImages: apiPrompt.reference_images || [],
+    watermarkedPreviewUrl: apiPrompt.watermarked_preview_url || null,
+    isBookmarked: Boolean(apiPrompt.is_bookmarked)
+  }
+}
 
 function DataFlow() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -77,13 +112,49 @@ function DataFlow() {
       ref={canvasRef}
       className="absolute inset-0 w-full h-full pointer-events-none"
       style={{ willChange: "transform" }}
-      aria-hidden="true"
+      aria-hidden={true}
+      tabIndex={-1}
     />
   )
 }
 
 export function FeaturedPrompts() {
-  const featured = prompts.slice(0, 6)
+  const [featured, setFeatured] = useState<any[]>([])
+  const [settings, setSettings] = useState({
+    landing_featured_title: "Featured Prompts",
+    landing_featured_subtitle: "Discover top-rated prompts from the best creators."
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const settingsRes = await getSettings().catch(() => ({} as Record<string, string>))
+        
+        let promptsRes;
+        const explicitIds = settingsRes.landing_featured_prompt_ids;
+        if (explicitIds && explicitIds.trim().length > 0) {
+            // Use explicitly selected prompt IDs
+            promptsRes = await getPrompts({ ids: explicitIds, per_page: '6', nsfw: 'true' });
+        } else {
+            // Fallback to latest curated prompts if no explicit selection
+            promptsRes = await getPrompts({ is_curated: '1', per_page: '6', nsfw: 'true' });
+        }
+        
+        setFeatured((promptsRes.data || []).map(mapApiPromptToCard).slice(0, 6))
+        setSettings((prev: { landing_featured_title: string; landing_featured_subtitle: string }) => ({
+          ...prev,
+          landing_featured_title: settingsRes.landing_featured_title || prev.landing_featured_title,
+          landing_featured_subtitle: settingsRes.landing_featured_subtitle || prev.landing_featured_subtitle
+        }))
+      } catch (err) {
+        console.error("Failed to load featured prompts", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   return (
     <section className="py-24 relative overflow-hidden">
@@ -98,10 +169,10 @@ export function FeaturedPrompts() {
           <div>
             <p className="text-sm font-bold text-[#b4ff39] uppercase tracking-widest mb-3 font-mono">{"// FEATURED"}</p>
             <h2 className="text-3xl md:text-5xl font-extrabold text-[#e0d4ff] text-balance">
-              Featured <span className="gradient-text">Prompts</span>
+              {settings.landing_featured_title}
             </h2>
             <p className="mt-3 text-[#a78bfa] leading-relaxed">
-              Discover top-rated prompts from the best creators.
+              {settings.landing_featured_subtitle}
             </p>
           </div>
           <Link
@@ -114,7 +185,11 @@ export function FeaturedPrompts() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featured.map((prompt) => (
+          {loading ? (
+            <div className="col-span-1 sm:col-span-2 lg:col-span-3 py-12 flex justify-center items-center">
+              <div className="w-8 h-8 border-4 border-[#00ffff] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : featured.map((prompt: any) => (
             <PromptCard key={prompt.id} prompt={prompt} />
           ))}
         </div>

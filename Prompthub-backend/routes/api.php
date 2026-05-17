@@ -24,10 +24,12 @@ use App\Http\Controllers\ArtistReviewController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SettingController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Public routes
+Route::get('/settings', [SettingController::class, 'index']);
 Route::get('/status', [\App\Http\Controllers\SystemStatusController::class, 'index']);
 Route::get('/stats', [\App\Http\Controllers\SystemStatusController::class, 'stats']);
 Route::get('/prompts', [PromptController::class, 'index']);
@@ -51,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/admin/login', [AdminAuthController::class, 'login']);
     Route::post('/admin/password/otp', [AdminAuthController::class, 'requestPasswordOtp']);
     Route::put('/admin/password', [AdminAuthController::class, 'changePassword']);
+    Route::put('/admin/settings', [SettingController::class, 'update']);
 
     // Users
     Route::get('/users/search', [UserController::class, 'search']);
