@@ -141,7 +141,7 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
               <span className="text-[10px] text-white/90 uppercase tracking-widest font-extrabold">Powered by</span>
-              <img src="/icon/0G-Logo-Purple_Hero.png" alt="0G" className="h-3.5 object-contain dark:invert dark:opacity-80" />
+              <img src="/icon/0g-white-logo.png" alt="0G" className="h-3.5" />
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-[#a78bfa]/50">

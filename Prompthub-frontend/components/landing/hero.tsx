@@ -156,13 +156,13 @@ export function Hero() {
             { label: "Listed Prompts", value: stats.listedPrompts, icon: Database, color: "text-secondary" },
             { label: "Total Volume", value: stats.totalVolume, icon: Hexagon, color: "text-accent" },
           ].map((stat, i) => (
-            <div key={stat.label} className={`p-6 flex items-start gap-4 ${i !== 2 ? 'border-b md:border-b-0 md:border-r border-white/10' : ''} group hover:bg-white/5 transition-colors`}>
-              <div className={`p-3 border border-white/10 ${stat.color} group-hover:border-current transition-colors`}>
-                <stat.icon className="w-6 h-6" />
+            <div key={stat.label} className={`p-4 md:p-6 flex items-start gap-3 md:gap-4 ${i !== 2 ? 'border-b md:border-b-0 md:border-r border-white/10' : ''} group hover:bg-white/5 transition-colors`}>
+              <div className={`p-2.5 md:p-3 border border-white/10 ${stat.color} group-hover:border-current transition-colors`}>
+                <stat.icon className="w-5 h-5 md:w-6 md:h-6" />
               </div>
               <div>
-                <p className="text-xs font-display text-white/60 font-bold uppercase tracking-widest mb-1">{stat.label}</p>
-                <p className={`text-2xl font-display font-bold ${stat.color}`}>{stat.value}</p>
+                <p className="text-[10px] md:text-xs font-display text-white/60 font-bold uppercase tracking-widest mb-1">{stat.label}</p>
+                <p className={`text-xl md:text-2xl font-display font-bold ${stat.color}`}>{stat.value}</p>
               </div>
             </div>
           ))}
