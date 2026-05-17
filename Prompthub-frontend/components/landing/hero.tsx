@@ -72,16 +72,16 @@ export function Hero() {
   }, [])
 
   return (
-    <section data-hero className="relative min-h-[92vh] flex items-start justify-center overflow-hidden bg-background pt-16">
+    <section data-hero className="relative min-h-[92vh] flex items-start justify-center overflow-hidden bg-background pt-6 md:pt-16">
       {/* Full-cover video background */}
       <video
         src="/video/landingpage-video.mp4"
         autoPlay
         loop
         muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        aria-hidden="true"
+        playsInline``
+      className="absolute inset-0 w-full h-full object-cover"
+      aria-hidden="true"
       />
 
       {/* Blur Glassmorphism Overlay (20% Opacity) */}
