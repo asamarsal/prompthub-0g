@@ -99,7 +99,7 @@ export function Hero() {
         <div className="inline-flex items-center gap-3 px-4 py-2 bg-background/90 backdrop-blur-sm border border-primary/30 shadow-[4px_4px_0_0_rgba(0,217,255,0.15)] mb-8 md:mb-22">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full bg-primary opacity-75"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
             <span className="font-mono text-xs text-primary uppercase tracking-widest font-bold">System Online</span>

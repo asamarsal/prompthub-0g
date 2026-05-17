@@ -101,7 +101,7 @@ export function Footer() {
                 className="h-8 w-auto object-contain"
               />
             </a>
-            <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xs">
+            <p className="mt-3 text-sm text-white/90 leading-relaxed max-w-xs">
               The 0G Marketplace Infrastructure for AI Creators to Monetize Every Prompt & Experiment. Powered by 0G and the 0G network.
             </p>
             {/* Pixel accent */}
@@ -121,7 +121,7 @@ export function Footer() {
                         href={item.href}
                         target={isExternal ? "_blank" : undefined}
                         rel={isExternal ? "noopener noreferrer" : undefined}
-                        className="text-sm text-white/60 hover:text-white transition-colors"
+                        className="text-sm text-white/90 hover:text-white transition-colors"
                       >
                         {item.label}
                       </Link>
@@ -136,20 +136,20 @@ export function Footer() {
         {/* Bottom bar — animates bottom → up */}
         <div ref={bottomBarRef} className="mt-10 pt-6 border-t border-[rgba(180,120,255,0.1)] flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-white/90">
               © 2026 PromptHub <span className="mx-4"> |</span>
             </p>
             <div className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
-              <span className="text-[10px] text-white/40 uppercase tracking-widest font-extrabold">Powered by</span>
+              <span className="text-[10px] text-white/90 uppercase tracking-widest font-extrabold">Powered by</span>
               <img src="/icon/0G-Logo-Purple_Hero.png" alt="0G" className="h-3.5 object-contain dark:invert dark:opacity-80" />
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-[#a78bfa]/50">
-            <span className="text-[#ff2d95]/60">0G Network</span>
+            <span className="text-[#ff2d95]/90">0G Network</span>
             <span className="w-1.5 h-1.5 rounded-full bg-[#00ffff]" />
-            <span className="text-[#00ffff]/60">0G Payments</span>
+            <span className="text-[#00ffff]/90">0G Payments</span>
             <span className="w-1.5 h-1.5 rounded-full bg-[#00ffff]" />
-            <span className="text-[#b4ff39]/60">Decentralized</span>
+            <span className="text-[#b4ff39]/90">Decentralized</span>
           </div>
         </div>
       </div>
