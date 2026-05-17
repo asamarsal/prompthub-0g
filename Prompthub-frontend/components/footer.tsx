@@ -140,7 +140,7 @@ export function Footer() {
               © 2026 PromptHub <span className="mx-4"> |</span>
             </p>
             <div className="flex items-center gap-2 opacity-90 hover:opacity-100 transition-opacity">
-              <span className="text-[10px] text-white/90 uppercase tracking-widest font-extrabold">Powered by</span>
+              <span className="text-[10px] text-white/100 uppercase tracking-widest font-extrabold">Powered by</span>
               <img src="/icon/0g-white-logo.png" alt="0G" className="h-3.5" />
             </div>
           </div>

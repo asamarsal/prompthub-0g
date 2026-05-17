@@ -72,7 +72,7 @@ export function Hero() {
   }, [])
 
   return (
-    <section data-hero className="relative min-h-[92vh] flex items-start justify-center overflow-hidden bg-background pt-6 md:pt-16">
+    <section data-hero className="relative min-h-[92vh] flex items-start justify-center overflow-hidden bg-background pt-12 md:pt-16">
       {/* Full-cover video background */}
       <video
         src="/video/landingpage-video.mp4"
@@ -150,19 +150,19 @@ export function Hero() {
         </div>
 
         {/* Stats / Nodes readout */}
-        <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 border border-white/20 bg-black/50 backdrop-blur-md shadow-[8px_8px_0_0_rgba(0,0,0,0.15)]">
+        <div className="w-full max-w-5xl grid grid-cols-3 border border-white/20 bg-black/50 backdrop-blur-md shadow-[8px_8px_0_0_rgba(0,0,0,0.15)]">
           {[
             { label: "Active Creators", value: stats.activeCreators, icon: Globe, color: "text-primary" },
             { label: "Listed Prompts", value: stats.listedPrompts, icon: Database, color: "text-secondary" },
             { label: "Total Volume", value: stats.totalVolume, icon: Hexagon, color: "text-accent" },
           ].map((stat, i) => (
-            <div key={stat.label} className={`p-4 md:p-6 flex items-start gap-3 md:gap-4 ${i !== 2 ? 'border-b md:border-b-0 md:border-r border-white/10' : ''} group hover:bg-white/5 transition-colors`}>
-              <div className={`p-2.5 md:p-3 border border-white/10 ${stat.color} group-hover:border-current transition-colors`}>
-                <stat.icon className="w-5 h-5 md:w-6 md:h-6" />
+            <div key={stat.label} className={`p-3 md:p-6 flex flex-col items-center text-center md:flex-row md:items-start md:text-left gap-2.5 md:gap-4 ${i !== 2 ? 'border-r border-white/10' : ''} group hover:bg-white/5 transition-colors`}>
+              <div className={`p-2 md:p-3 border border-white/10 ${stat.color} group-hover:border-current transition-colors`}>
+                <stat.icon className="w-4 h-4 md:w-6 md:h-6" />
               </div>
-              <div>
-                <p className="text-[10px] md:text-xs font-display text-white/60 font-bold uppercase tracking-widest mb-1">{stat.label}</p>
-                <p className={`text-xl md:text-2xl font-display font-bold ${stat.color}`}>{stat.value}</p>
+              <div className="flex flex-col items-center md:items-start">
+                <p className="text-[8px] min-[360px]:text-[9px] md:text-xs font-display text-white/60 font-bold uppercase tracking-wider md:tracking-widest mb-0.5 md:mb-1">{stat.label}</p>
+                <p className={`text-sm min-[360px]:text-base md:text-2xl font-display font-bold ${stat.color}`}>{stat.value}</p>
               </div>
             </div>
           ))}
