@@ -94,13 +94,13 @@ export function Footer() {
         <div ref={topGridRef} className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center" aria-label="PromptHub Home">
+            <a href="https://0g.ai/" target="_blank" rel="noopener noreferrer" className="flex items-center" aria-label="0G Network">
               <img
                 src="/icon/0G-Logo-Purple_Hero.png"
-                alt="PromptHub"
+                alt="0G Network"
                 className="h-8 w-auto object-contain"
               />
-            </Link>
+            </a>
             <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-xs">
               The 0G Marketplace Infrastructure for AI Creators to Monetize Every Prompt & Experiment. Powered by 0G and the 0G network.
             </p>
@@ -146,9 +146,9 @@ export function Footer() {
           </div>
           <div className="flex items-center gap-4 text-xs text-[#a78bfa]/50">
             <span className="text-[#ff2d95]/60">0G Network</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-[#ff2d95] to-[#00ffff]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00ffff]" />
             <span className="text-[#00ffff]/60">0G Payments</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-[#00ffff] to-[#b4ff39]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00ffff]" />
             <span className="text-[#b4ff39]/60">Decentralized</span>
           </div>
         </div>
