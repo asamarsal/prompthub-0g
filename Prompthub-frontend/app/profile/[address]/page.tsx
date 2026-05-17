@@ -283,7 +283,7 @@ function ProfileContent({ params }: { params: { address: string } }) {
         { id: "overview", label: "Overview" },
         ...(displayProfile.roles.includes("artist") ? [{ id: "portfolio" as Tab, label: "Portfolio" }] : []),
         { id: "prompts", label: "Prompts" },
-        ...(isOwn ? [{ id: "collections" as Tab, label: "Collections" }] : []),
+        ...(isOwn ? [{ id: "collections" as Tab, label: "Bookmark" }] : []),
         ...(isOwn ? [{ id: "purchased" as Tab, label: "Purchased" }] : []),
         ...(displayProfile.roles.includes("brand") ? [{ id: "contests" as Tab, label: "Contests" }] : []),
         { id: "reviews", label: "Reviews" },
@@ -597,9 +597,9 @@ function ProfileContent({ params }: { params: { address: string } }) {
                             ) : (
                                 <div className="text-center py-20 border-2 border-dashed border-[#2a2a30] bg-white/[0.01]">
                                     <Heart className="w-10 h-10 mx-auto mb-4 text-white/20" />
-                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">Your collection is empty</h3>
+                                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">Your bookmarks are empty</h3>
                                     <p className="text-white/40 text-sm mt-2 max-w-xs mx-auto">
-                                        Save interesting prompts while browsing the marketplace to see them here.
+                                        Bookmark interesting prompts while browsing the marketplace to see them here.
                                     </p>
                                     <Link
                                         href="/marketplace"
