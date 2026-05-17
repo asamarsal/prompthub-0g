@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>The Onchain Economy for AI Prompt Creators</strong><br/>
-  NFT ownership · Escrow freelancing · Brand contests . powered by 5 smart contracts on 0G Galileo Testnet
+  NFT ownership · Escrow freelancing · Brand contests . powered by 5 smart contracts on 0G Mainnet
 </p>
 
 <p align="center">
