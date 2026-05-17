@@ -60,7 +60,7 @@ class PromptRecommendationController extends Controller
 
     private function findSimilarByAI(Prompt $prompt, array $excludeIds)
     {
-        if (!env('ZG_COMPUTE_API_KEY')) {
+        if (!config('0g.compute_api_key')) {
             return collect();
         }
 

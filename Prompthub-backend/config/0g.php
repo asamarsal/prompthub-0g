@@ -18,6 +18,7 @@ return [
     'storage_flow_contract' => env('OG_STORAGE_FLOW_CONTRACT', ''),
 
     // 0G Compute / Private Computer configuration
+    'compute_api_key' => env('ZG_COMPUTE_API_KEY'),
     'compute_base_url' => env('ZG_COMPUTE_BASE_URL', 'https://router-api.0g.ai/v1/proxy'),
     'compute_model' => env('ZG_COMPUTE_MODEL', '0GM-1.0-35B-A3B'),
     'compute_fallback_model' => env('ZG_COMPUTE_FALLBACK_MODEL', 'deepseek/deepseek-chat-v3-0324'),

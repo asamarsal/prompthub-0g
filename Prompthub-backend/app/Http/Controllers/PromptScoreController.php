@@ -45,7 +45,7 @@ class PromptScoreController extends Controller
 
     private function scoreInput(string $input): array
     {
-        $apiKey = env('ZG_COMPUTE_API_KEY');
+        $apiKey = config('0g.compute_api_key');
         if (!$apiKey) {
             return $this->heuristicScore($input, 'ZG_COMPUTE_API_KEY not configured');
         }

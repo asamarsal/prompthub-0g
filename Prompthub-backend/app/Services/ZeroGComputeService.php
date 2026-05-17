@@ -34,7 +34,7 @@ class ZeroGComputeService
     public function chatContent(array $messages, float $temperature = 0.2): ?array
     {
         $this->lastFailureReason = null;
-        $apiKey = env('ZG_COMPUTE_API_KEY');
+        $apiKey = config('0g.compute_api_key');
         if (!$apiKey) {
             $this->lastFailureReason = 'ZG_COMPUTE_API_KEY not configured';
             return null;

@@ -13,7 +13,7 @@ class ComputeHealthController extends Controller
 
     public function show(): JsonResponse
     {
-        $apiKey = env('ZG_COMPUTE_API_KEY');
+        $apiKey = config('0g.compute_api_key');
         $model = (string) config('0g.compute_model');
         $fallbackModel = (string) config('0g.compute_fallback_model');
 

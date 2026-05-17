@@ -222,6 +222,24 @@ async function request<T>(
     return res.json() as Promise<T>
 }
 
+// ─── System ───────────────────────────────────────────────────────────────
+
+export interface SystemStatusResponse {
+    status: "operational" | "degraded";
+    components: {
+        api: "up" | "down" | "degraded";
+        database: "up" | "down" | "degraded";
+        "0g_storage": "up" | "down" | "degraded";
+        blockchain_rpc: "up" | "down" | "degraded";
+        websocket: "up" | "down" | "degraded";
+    };
+    timestamp: string;
+}
+
+export async function getSystemStatus(): Promise<SystemStatusResponse> {
+    return request<SystemStatusResponse>("/api/status")
+}
+
 // ─── Media ────────────────────────────────────────────────────────────────
 
 export interface UploadResponse {

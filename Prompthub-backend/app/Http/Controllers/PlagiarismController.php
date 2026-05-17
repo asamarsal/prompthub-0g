@@ -135,7 +135,7 @@ class PlagiarismController extends Controller
      */
     private function checkWithAI(string $title, string $description, string $content, $dbMatches): ?array
     {
-        $apiKey = env('ZG_COMPUTE_API_KEY');
+        $apiKey = config('0g.compute_api_key');
         if (!$apiKey) {
             return null;
         }
