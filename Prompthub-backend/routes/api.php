@@ -29,6 +29,7 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Public routes
 Route::get('/status', [\App\Http\Controllers\SystemStatusController::class, 'index']);
+Route::get('/stats', [\App\Http\Controllers\SystemStatusController::class, 'stats']);
 Route::get('/prompts', [PromptController::class, 'index']);
 Route::get('/prompts/{id}', [PromptController::class, 'show'])->whereUuid('id');
 Route::get('/contests', [ContestController::class, 'index']);

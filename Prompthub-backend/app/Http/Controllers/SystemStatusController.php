@@ -30,6 +30,27 @@ class SystemStatusController extends Controller
         ]);
     }
 
+    public function stats(): JsonResponse
+    {
+        try {
+            $activeCreators = \App\Models\Prompt::where('is_published', true)->distinct('user_id')->count('user_id');
+            $listedPrompts = \App\Models\Prompt::where('is_published', true)->count();
+            $totalVolume = \App\Models\Prompt::where('is_published', true)->sum('price_0g');
+
+            return response()->json([
+                'active_creators' => $activeCreators,
+                'listed_prompts' => $listedPrompts,
+                'total_volume' => (float) $totalVolume,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Stats API Error: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to fetch marketplace stats',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     private function checkDatabase(): string
     {
         try {

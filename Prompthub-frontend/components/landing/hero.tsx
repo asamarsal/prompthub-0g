@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Hexagon, Database, Globe } from "lucide-react"
+import { getMarketplaceStats } from "@/lib/api"
 
 const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*"
 
@@ -42,6 +43,33 @@ function useScramble(target: string, durationMs = 3000, delayMs = 0) {
 export function Hero() {
   const promptText = useScramble("PROMPT", 1000, 0)
   const hubText = useScramble("HUB", 1000, 1000)
+
+  const [stats, setStats] = useState({
+    activeCreators: "",
+    listedPrompts: "",
+    totalVolume: ""
+  })
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const data = await getMarketplaceStats()
+        setStats({
+          activeCreators: data.active_creators.toLocaleString(),
+          listedPrompts: data.listed_prompts.toLocaleString(),
+          totalVolume: `${data.total_volume.toFixed(1)} 0G`
+        })
+      } catch (err) {
+        console.error("Failed to load marketplace stats:", err)
+        setStats({
+          activeCreators: "Fail to fetch",
+          listedPrompts: "Fail to fetch",
+          totalVolume: "Fail to fetch"
+        })
+      }
+    }
+    loadStats()
+  }, [])
 
   return (
     <section data-hero className="relative min-h-[92vh] flex items-start justify-center overflow-hidden bg-background pt-16">
@@ -124,9 +152,9 @@ export function Hero() {
         {/* Stats / Nodes readout */}
         <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 border border-white/20 bg-black/50 backdrop-blur-md shadow-[8px_8px_0_0_rgba(0,0,0,0.15)]">
           {[
-            { label: "Active Creators", value: "1,204", icon: Globe, color: "text-primary" },
-            { label: "Listed Prompts", value: "8,492", icon: Database, color: "text-secondary" },
-            { label: "Total Volume", value: "45.2 0G", icon: Hexagon, color: "text-accent" },
+            { label: "Active Creators", value: stats.activeCreators, icon: Globe, color: "text-primary" },
+            { label: "Listed Prompts", value: stats.listedPrompts, icon: Database, color: "text-secondary" },
+            { label: "Total Volume", value: stats.totalVolume, icon: Hexagon, color: "text-accent" },
           ].map((stat, i) => (
             <div key={stat.label} className={`p-6 flex items-start gap-4 ${i !== 2 ? 'border-b md:border-b-0 md:border-r border-white/10' : ''} group hover:bg-white/5 transition-colors`}>
               <div className={`p-3 border border-white/10 ${stat.color} group-hover:border-current transition-colors`}>

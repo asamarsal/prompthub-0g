@@ -240,6 +240,16 @@ export async function getSystemStatus(): Promise<SystemStatusResponse> {
     return request<SystemStatusResponse>("/api/status")
 }
 
+export interface MarketplaceStats {
+    active_creators: number;
+    listed_prompts: number;
+    total_volume: number;
+}
+
+export async function getMarketplaceStats(): Promise<MarketplaceStats> {
+    return request<MarketplaceStats>("/api/stats")
+}
+
 // ─── Media ────────────────────────────────────────────────────────────────
 
 export interface UploadResponse {
