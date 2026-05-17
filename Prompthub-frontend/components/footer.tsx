@@ -10,14 +10,14 @@ const links = {
     { href: "/dashboard", label: "Dashboard" },
   ],
   Community: [
-    { href: "#", label: "Discord" },
+    { href: "https://discordapp.com/users/475303864317247488", label: "Discord" },
     { href: "https://x.com/exluminated", label: "Twitter" },
-    { href: "https://github.com/asamarsal/Prompthub", label: "GitHub" },
+    { href: "https://github.com/asamarsal/prompthub-0g", label: "GitHub" },
   ],
   Resources: [
-    { href: "https://github.com/asamarsal/Prompthub/blob/main/README.md", label: "Documentation" },
-    { href: "#", label: "API" },
-    { href: "#", label: "Status" },
+    { href: "https://github.com/asamarsal/prompthub-0g/blob/main/README.md", label: "Documentation" },
+    { href: "https://prompthubdapps.biz.id/", label: "API" },
+    { href: "/status", label: "Status" },
   ],
 }
 
@@ -113,16 +113,21 @@ export function Footer() {
             <div key={group}>
               <h3 className="text-sm font-bold text-[#00ffff] uppercase tracking-wider">{group}</h3>
               <ul className="mt-3 flex flex-col gap-2">
-                {items.map((item) => (
-                  <li key={item.label}>
-                    <Link
-                      href={item.href}
-                      className="text-sm text-white/60 hover:text-white transition-colors"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+                {items.map((item) => {
+                  const isExternal = item.href.startsWith("http");
+                  return (
+                    <li key={item.label}>
+                      <Link
+                        href={item.href}
+                        target={isExternal ? "_blank" : undefined}
+                        rel={isExternal ? "noopener noreferrer" : undefined}
+                        className="text-sm text-white/60 hover:text-white transition-colors"
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
